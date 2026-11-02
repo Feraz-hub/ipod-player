@@ -213,8 +213,13 @@ export default function Upload({
             <UploadCloud size={17} /> Sign in to save to your account
           </button>
           <label className="checkbox">
-            <input type="checkbox" checked={deviceConsent} onChange={e => setDeviceConsent(e.target.checked)} />
-            Import on this device instead. This is not a cloud backup; clearing site data or iPhone storage cleanup can remove it.
+            <input
+              type="checkbox"
+              checked={deviceConsent}
+              onChange={(e) => setDeviceConsent(e.target.checked)}
+            />
+            Import on this device instead. This is not a cloud backup; clearing
+            site data or iPhone storage cleanup can remove it.
           </label>
         </div>
       )}
@@ -352,7 +357,9 @@ export default function Upload({
         )}
         <button
           className="primary full"
-          disabled={!file || reading || busy || (!accountStorage && !deviceConsent)}
+          disabled={
+            !file || reading || busy || (!accountStorage && !deviceConsent)
+          }
           type="submit"
         >
           {busy ? (

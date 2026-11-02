@@ -19,7 +19,7 @@ npm run build
 npm run preview
 ```
 
-`npm test` runs 19 checks: real PostgreSQL migration and row-level access tests using PGlite, the actual Edge handler against a mocked Auth/Storage transport, upload validation, wheel boundary cases, video manifest/license/SD-source consistency, and project-path/offline-cache privacy checks. No Supabase account is required for these tests. Hosted Auth, Storage and Edge Functions still need the live setup and acceptance check below.
+`npm test` runs 20 checks: real PostgreSQL migration and row-level access tests using PGlite, the actual Edge handler against a mocked Auth/Storage transport, upload validation, wheel boundary cases, video manifest/license/SD-source consistency, project-path/offline-cache privacy checks, and Home Screen email-link validation. No Supabase account is required for these tests. Hosted Auth, Storage and Edge Functions still need the live setup and acceptance check below.
 
 ## iPhone Home Screen
 
@@ -59,7 +59,7 @@ The highlighted song smoothly grows larger than neighboring rows, including its 
 
 ## Connect Supabase Free
 
-Cloud account features require a connected Supabase Free project. No billing or paid upgrades are included.
+The hosted player is connected to a dedicated Nightshift iPod Supabase Free project. Its schema, private buckets, gateway and production auth URL are deployed. No billing or paid upgrades are enabled. The steps below document rebuilding this setup in a new project; do not rerun the initial migration in the existing database.
 
 1. Create a **Free** Supabase project in a Free organization. Use a dedicated project for this app. Do not add a payment method or enable a paid plan. If a service requests payment, keep using local mode.
 2. In the new project's SQL Editor, execute `supabase/migrations/202611020001_nightshift.sql` **once**. It creates tables, policies, atomic limit functions, and the two private storage buckets. The migration is intended for a fresh project.
@@ -84,12 +84,12 @@ Cloud account features require a connected Supabase Free project. No billing or 
 
 6. Copy `.env.example` to `.env.local`. Fill in the project URL and its **public publishable/anon key**. Leave `VITE_BASE_PATH=/` for local development. Restart Vite after changing the file.
 7. In **Authentication → URL Configuration**, set the Site URL to the future site URL. Add both localhost URLs and the exact future Pages URL as allowed redirect URLs, for example `https://YOUR_USERNAME.github.io/YOUR_REPOSITORY/`.
-8. Enable Email auth. The app offers magic-link sign-in. Supabase's built-in email sender currently only sends to organization team addresses and is limited to roughly two emails per hour. Test with your project owner's email. Public sign-ins require custom SMTP; use a free SMTP allowance you already have that requires no payment method, or use the included GitHub OAuth option described below. Do not enable paid email delivery to proceed. [Supabase SMTP restrictions](https://supabase.com/docs/guides/auth/auth-smtp).
+8. Enable Email auth. The app offers magic-link sign-in. In an iPhone Home Screen app, hold the Sign in link in the email, choose Copy Link, and paste it into the player’s sign-in form before opening it elsewhere. Only this project’s verification links are accepted. A one-time code is also supported if your custom email template supplies one. Supabase Free currently requires custom SMTP for editing email templates. Supabase's built-in email sender currently only sends to organization team addresses and is limited to roughly two emails per hour. Test with your project owner's email. Public sign-ins require custom SMTP; use a free SMTP allowance you already have that requires no payment method, or use the included GitHub OAuth option described below. Do not enable paid email delivery to proceed. [Supabase SMTP restrictions](https://supabase.com/docs/guides/auth/auth-smtp).
 9. After signing in, add a file again to save it in your account. Browser-local files are not silently uploaded. Your private audio metadata and file are then readable only by your account through the app. Application moderators can review clips but cannot browse or stream other accounts' music.
 
 ### Optional GitHub sign-in without SMTP
 
-The sign-in dialog also offers **Continue with GitHub**. To enable it, create a GitHub OAuth App in your GitHub account's **Settings → Developer settings → OAuth Apps**. Set the homepage to your website URL and the authorization callback URL to `https://YOUR_PROJECT_REF.supabase.co/auth/v1/callback`. In Supabase **Authentication → Sign In / Providers → GitHub**, enable GitHub and enter that OAuth App's Client ID and Client Secret. Keep the secret in Supabase's provider settings only. Retain your site URLs in the auth redirect allowlist. This uses GitHub's account sign-in and does not send magic-link emails or require a paid SMTP service. An unconfigured provider returns an auth error; local mode remains available.
+The sign-in dialog can also offer **Continue with GitHub**. It is hidden until configured. Set the public build variable `VITE_GITHUB_AUTH_ENABLED=true` only after completing the provider setup, then redeploy. To configure it, create a GitHub OAuth App in your GitHub account's **Settings → Developer settings → OAuth Apps**. Set the homepage to your website URL and the authorization callback URL to `https://YOUR_PROJECT_REF.supabase.co/auth/v1/callback`. In Supabase **Authentication → Sign In / Providers → GitHub**, enable GitHub and enter that OAuth App's Client ID and Client Secret. Keep the secret in Supabase's provider settings only. Retain your site URLs in the auth redirect allowlist. This uses GitHub's account sign-in and does not send magic-link emails or require a paid SMTP service. An unconfigured provider returns an auth error; local mode remains available.
 
 ### Moderation queue
 

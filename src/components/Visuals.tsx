@@ -145,16 +145,19 @@ function SilentVideo({
   }, [src]);
   useEffect(() => {
     const v = ref.current!;
+    let active = true;
     v.muted = true;
     if (paused) v.pause();
     else
-      void v
-        .play()
-        .catch(() =>
+      void v.play().catch((error: DOMException) => {
+        if (active && error.name === "NotAllowedError")
           onError(
             "Tap Play to start the clip. Your browser paused automatic video playback.",
-          ),
-        );
+          );
+      });
+    return () => {
+      active = false;
+    };
   }, [src, paused]);
   return (
     <>

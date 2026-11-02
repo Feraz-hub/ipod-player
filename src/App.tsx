@@ -55,6 +55,7 @@ import Dialog from "./components/Dialog";
 import Scene from "./components/Scene";
 import UploadDialog from "./components/Upload";
 import HomeScreen from "./components/HomeScreen";
+import { signInToken } from "./lib/sign-in-link.mjs";
 import Visuals from "./components/Visuals";
 import {
   AlleyBackground,
@@ -1010,13 +1011,18 @@ export default function App() {
             kind={upload}
             account={!!user}
             onClose={() => setUpload(null)}
-            onSignIn={() => { setUpload(null); setModal("auth"); }}
+            onSignIn={() => {
+              setUpload(null);
+              setModal("auth");
+            }}
             onDone={(destination) => {
               void refresh();
               notify(
                 destination === "cloud" && upload === "clip"
                   ? "Clip submitted for moderation."
-                  : destination === "cloud" ? "Saved to your private account library." : "Imported on this device. Keep your original file.",
+                  : destination === "cloud"
+                    ? "Saved to your private account library."
+                    : "Imported on this device. Keep your original file.",
               );
             }}
             onError={notify}
@@ -1347,6 +1353,7 @@ function Account({
   storage: Usage;
 }) {
   const [email, setEmail] = useState(""),
+    [code, setCode] = useState(""),
     [busy, setBusy] = useState(false),
     [sent, setSent] = useState(false),
     [error, setError] = useState("");
@@ -1382,6 +1389,28 @@ function Account({
       if (error) throw error;
     } catch (e) {
       setError(errorText(e));
+      setBusy(false);
+    }
+  }
+  async function verifyCode(e: React.FormEvent) {
+    e.preventDefault();
+    if (!cloud) return;
+    setBusy(true);
+    setError("");
+    try {
+      const value = code.trim();
+      const { error } = await cloud.auth.verifyOtp(
+        value.startsWith("https:")
+          ? {
+              token_hash: signInToken(value, import.meta.env.VITE_SUPABASE_URL),
+              type: "email",
+            }
+          : { email, token: value.replace(/\s/g, ""), type: "email" },
+      );
+      if (error) throw error;
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
       setBusy(false);
     }
   }
@@ -1437,14 +1466,53 @@ function Account({
       ) : cloud ? (
         <>
           <p className="muted">
-            Sign in with a magic link. Your uploaded music stays private,
+            Sign in with an email link. Your uploaded music stays private,
             wherever the night takes you.
           </p>
           {sent ? (
             <div className="sent-state">
               <Check size={30} />
               <h3>Check your inbox.</h3>
-              <p>Open the sign-in link sent to {email}. No password needed.</p>
+              <p>
+                Open the sign-in email sent to {email}. On your Home Screen app,
+                hold the email’s Sign in button, choose Copy Link, then paste it
+                below to sign in here.
+              </p>
+              <form onSubmit={verifyCode}>
+                <label>
+                  Sign-in link or code
+                  <input
+                    autoComplete="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    required
+                    maxLength={3000}
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    placeholder="Paste the link from your email"
+                  />
+                </label>
+                {error && (
+                  <p className="form-error" role="alert">
+                    {error}
+                  </p>
+                )}
+                <button className="primary full" disabled={busy}>
+                  {busy ? "Signing in…" : "Sign in"}
+                </button>
+                <button
+                  className="outline full"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    setSent(false);
+                    setCode("");
+                    setError("");
+                  }}
+                >
+                  Use a different email
+                </button>
+              </form>
             </div>
           ) : (
             <form onSubmit={signIn}>
@@ -1467,15 +1535,17 @@ function Account({
                 {busy ? "Sending…" : "Send me a sign-in link"}
                 <ArrowUpRight size={16} />
               </button>
-              <button
-                className="outline full"
-                type="button"
-                disabled={busy}
-                onClick={() => void githubSignIn()}
-              >
-                <Github size={16} />
-                Continue with GitHub
-              </button>
+              {import.meta.env.VITE_GITHUB_AUTH_ENABLED === "true" && (
+                <button
+                  className="outline full"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void githubSignIn()}
+                >
+                  <Github size={16} />
+                  Continue with GitHub
+                </button>
+              )}
             </form>
           )}
         </>

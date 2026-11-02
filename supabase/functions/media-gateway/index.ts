@@ -6,7 +6,7 @@ const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
 });
 const allowed = (
   Deno.env.get("ALLOWED_ORIGINS") ||
-  "http://127.0.0.1:5173,http://localhost:5173"
+  "http://127.0.0.1:5173,http://localhost:5173,https://feraz-hub.github.io"
 )
   .split(",")
   .map((s) => s.trim());

@@ -1,6 +1,8 @@
 .ipod-stage {
   min-height: 100svh;
-  padding: max(48px, env(safe-area-inset-top)) max(30px, env(safe-area-inset-right)) max(30px, env(safe-area-inset-bottom)) max(30px, env(safe-area-inset-left));
+  padding: max(48px, env(safe-area-inset-top))
+    max(30px, env(safe-area-inset-right)) max(30px, env(safe-area-inset-bottom))
+    max(30px, env(safe-area-inset-left));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -375,7 +377,10 @@
     display: none;
   }
   .ipod-stage {
-    padding: 24px 16px;
+    padding: max(24px, env(safe-area-inset-top))
+      max(16px, env(safe-area-inset-right))
+      max(24px, env(safe-area-inset-bottom))
+      max(16px, env(safe-area-inset-left));
   }
   .ipod-body,
   .display-expanded .ipod-body {

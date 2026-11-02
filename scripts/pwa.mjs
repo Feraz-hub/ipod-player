@@ -1,10 +1,13 @@
-import { createHash } from 'node:crypto';
+import { createHash } from "node:crypto";
 
 // Cache the published app shell only. Private music, auth responses and remote
 // clips must never enter a shared service-worker cache.
 export function makeWorker(base, assets) {
   const paths = [...new Set(assets.map((name) => `${base}${name}`))].sort();
-  const version = createHash('sha256').update(JSON.stringify(paths)).digest('hex').slice(0, 16);
+  const version = createHash("sha256")
+    .update(JSON.stringify(paths))
+    .digest("hex")
+    .slice(0, 16);
   return `const PREFIX = ${JSON.stringify(`nightshift-shell:${base}:`)};
 const CACHE = PREFIX + ${JSON.stringify(version)};
 const BASE = ${JSON.stringify(base)};
@@ -32,15 +35,32 @@ self.addEventListener('fetch', event => {
 }
 
 export default function appShell() {
-  let base = '/';
+  let base = "/";
   return {
-    name: 'nightshift-app-shell',
-    apply: 'build',
-    configResolved(config) { base = config.base; },
+    name: "nightshift-app-shell",
+    apply: "build",
+    configResolved(config) {
+      base = config.base;
+    },
     generateBundle(_options, bundle) {
-      const assets = Object.keys(bundle).filter(name => !name.endsWith('.map'));
-      assets.push('index.html', 'manifest.webmanifest', 'favicon.svg', 'night-alley.jpg', 'city-night.jpg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png');
-      this.emitFile({type: 'asset', fileName: 'sw.js', source: makeWorker(base, assets)});
+      const assets = Object.keys(bundle).filter(
+        (name) => !name.endsWith(".map"),
+      );
+      assets.push(
+        "index.html",
+        "manifest.webmanifest",
+        "favicon.svg",
+        "night-alley.jpg",
+        "city-night.jpg",
+        "icons/icon-192.png",
+        "icons/icon-512.png",
+        "icons/apple-touch-icon.png",
+      );
+      this.emitFile({
+        type: "asset",
+        fileName: "sw.js",
+        source: makeWorker(base, assets),
+      });
     },
   };
 }

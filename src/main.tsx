@@ -12,9 +12,13 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     // A new version activates after the old app closes; uploads are never
     // interrupted by a forced reload. IndexedDB is separate from shell caches.
-    void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, {
-      scope: import.meta.env.BASE_URL,
-      updateViaCache: "none",
-    }).catch(() => { /* The online player still works without offline support. */ });
+    void navigator.serviceWorker
+      .register(`${import.meta.env.BASE_URL}sw.js`, {
+        scope: import.meta.env.BASE_URL,
+        updateViaCache: "none",
+      })
+      .catch(() => {
+        /* The online player still works without offline support. */
+      });
   });
 }
