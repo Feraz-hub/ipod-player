@@ -1,0 +1,4 @@
+project_id = "nightshift"
+
+[functions.media-gateway]
+verify_jwt = false

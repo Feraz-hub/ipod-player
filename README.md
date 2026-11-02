@@ -183,4 +183,3 @@ The player uses local Arial/Helvetica/system fonts. Icons are Lucide. No analyti
 ## Verification and practical limits
 
 Local browser testing covers desktop and phone layouts, center/outer wheel actions, audio start/pause, metadata import, favorites and file persistence. The production build and SQL/access tests run locally. Live Supabase integration is not claimed to be verified without your project. Browser quota eviction, disabled site storage, unsupported codecs, provider downtime and slow connections can interrupt playback. Keep originals of local uploads: IndexedDB is not a backup. There is no cross-device synchronization until Supabase is configured, no automatic rights verification, and no promise that unrestricted public traffic fits free hosting.
-
