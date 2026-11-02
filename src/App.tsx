@@ -1401,10 +1401,13 @@ function Account({
       const value = code.trim();
       const { error } = await cloud.auth.verifyOtp(
         value.startsWith("https:")
-          ? {
-              token_hash: signInToken(value, import.meta.env.VITE_SUPABASE_URL),
-              type: "email",
-            }
+          ? (() => {
+              const verified = signInToken(
+                value,
+                import.meta.env.VITE_SUPABASE_URL,
+              );
+              return { token_hash: verified.token, type: verified.type };
+            })()
           : { email, token: value.replace(/\s/g, ""), type: "email" },
       );
       if (error) throw error;
@@ -1474,9 +1477,9 @@ function Account({
               <Check size={30} />
               <h3>Check your inbox.</h3>
               <p>
-                Open the sign-in email sent to {email}. On your Home Screen app,
-                hold the email’s Sign in button, choose Copy Link, then paste it
-                below to sign in here.
+                Open the email sent to {email}. On your Home Screen app, hold
+                its confirmation or Sign in button, choose Copy Link, then paste
+                it below to finish signing in here.
               </p>
               <form onSubmit={verifyCode}>
                 <label>

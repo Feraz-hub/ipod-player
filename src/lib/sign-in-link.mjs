@@ -14,5 +14,12 @@ export function signInToken(link, projectUrl) {
     throw new Error(
       "This sign-in link is incomplete. Copy the link from the email again.",
     );
-  return token;
+  const rawType = url.searchParams.get("type");
+  const type =
+    rawType === "signup"
+      ? "signup"
+      : rawType === "magiclink"
+        ? "magiclink"
+        : "email";
+  return { token, type };
 }

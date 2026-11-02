@@ -5,12 +5,19 @@ import { signInToken } from "../src/lib/sign-in-link.mjs";
 test("Home Screen sign-in accepts only this project’s complete verification link", () => {
   const project = "https://project.supabase.co";
   const token = "a".repeat(64);
-  assert.equal(
+  assert.deepEqual(
     signInToken(
       `${project}/auth/v1/verify?token=${token}&type=magiclink`,
       project,
     ),
-    token,
+    { token, type: "magiclink" },
+  );
+  assert.deepEqual(
+    signInToken(
+      `${project}/auth/v1/verify?token_hash=${token}&type=signup`,
+      project,
+    ),
+    { token, type: "signup" },
   );
   assert.throws(() =>
     signInToken(
