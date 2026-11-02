@@ -377,16 +377,26 @@
     display: none;
   }
   .ipod-stage {
-    padding: max(24px, env(safe-area-inset-top))
-      max(16px, env(safe-area-inset-right))
-      max(24px, env(safe-area-inset-bottom))
-      max(16px, env(safe-area-inset-left));
+    min-height: 100dvh;
+    padding: max(12px, env(safe-area-inset-top))
+      max(12px, env(safe-area-inset-right))
+      max(12px, env(safe-area-inset-bottom))
+      max(12px, env(safe-area-inset-left));
   }
   .ipod-body,
   .display-expanded .ipod-body {
     width: min(470px, 100%);
+    min-height: 90svh;
+    min-height: min(
+      90svh,
+      calc(
+        100dvh - max(12px, env(safe-area-inset-top)) -
+          max(12px, env(safe-area-inset-bottom)) - 16px
+      )
+    );
     padding: 24px 22px 32px;
     grid-template-columns: minmax(0, 1fr);
+    align-content: space-evenly;
     gap: 28px;
     border-radius: 32px;
   }
@@ -398,14 +408,11 @@
   }
   .ipod-hardware .wheel-wrap,
   .display-expanded .ipod-hardware .wheel-wrap {
-    width: clamp(190px, 58vw, 250px);
-    height: clamp(190px, 58vw, 250px);
+    width: clamp(200px, 64vw, 270px);
+    height: clamp(200px, 64vw, 270px);
   }
   .ipod-gesture-hint {
-    font-size: 10px;
-    max-width: 270px;
-    line-height: 1.6;
-    margin-top: 24px;
+    display: none;
   }
   .ipod-screen-bezel {
     padding: 7px;
