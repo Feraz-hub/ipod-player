@@ -76,6 +76,11 @@ const errorText = (e: unknown) =>
     : typeof e === "object" && e && "message" in e
       ? String(e.message)
       : "Something went wrong. Please try again.";
+const DEFAULT_IPOD_COLOR = "#c6cbc5";
+const validIpodColor = (value: unknown) =>
+  typeof value === "string" && /^#[\da-f]{6}$/i.test(value)
+    ? value
+    : DEFAULT_IPOD_COLOR;
 
 export default function App() {
   const wheelSound = useWheelSound();
@@ -94,6 +99,7 @@ export default function App() {
     [position, setPosition] = useState(0),
     [duration, setDuration] = useState(0),
     [volume, setVolume] = useState(0.55),
+    [ipodColor, setIpodColor] = useState(DEFAULT_IPOD_COLOR),
     [dimmer, setDimmer] = useState(0.25),
     [shuffle, setShuffle] = useState(false),
     [repeat, setRepeat] = useState(false),
@@ -134,6 +140,7 @@ export default function App() {
       current,
       position,
       volume,
+      ipodColor,
       dimmer,
       shuffle,
       repeat,
@@ -148,6 +155,7 @@ export default function App() {
     current,
     position,
     volume,
+    ipodColor,
     dimmer,
     shuffle,
     repeat,
@@ -191,6 +199,7 @@ export default function App() {
         if (s) {
           restore.current = s;
           setVolume(s.volume ?? 0.55);
+          setIpodColor(validIpodColor(s.ipodColor));
           setDimmer(s.dimmer ?? 0.25);
           setShuffle(!!s.shuffle);
           setRepeat(!!s.repeat);
@@ -289,6 +298,13 @@ export default function App() {
     };
   }, [user]);
   useEffect(() => {
+    if (!stateReady.current) return;
+    const s = latest.current;
+    const state = { ...s, current: undefined, id: s.current?.id };
+    void setSetting("player", state).catch(() => {});
+    if (cloud && user) void api("state", { state }).catch(() => {});
+  }, [ipodColor]);
+  useEffect(() => {
     if (user)
       void api("state")
         .then((d) => {
@@ -297,6 +313,7 @@ export default function App() {
             restore.current = s;
             setFavorites(s.favorites || []);
             setVolume(s.volume ?? 0.55);
+            setIpodColor(validIpodColor(s.ipodColor));
             setShuffle(!!s.shuffle);
             setRepeat(!!s.repeat);
             setDimmer(s.dimmer ?? 0.25);
@@ -640,6 +657,7 @@ export default function App() {
   }, [cinema, revealChrome]);
   return (
     <IPodDevice
+      shellColor={ipodColor}
       onInteract={wheelSound.unlock}
       caption={
         cinema
@@ -1041,6 +1059,19 @@ export default function App() {
         {modal === "settings" && (
           <Dialog title="Make it your own." onClose={() => setModal(null)}>
             <HomeScreen />
+            <div className="ipod-color-setting">
+              <label htmlFor="ipod-shell-color">iPod color</label>
+              <div className="ipod-color-picker">
+                <input
+                  id="ipod-shell-color"
+                  type="color"
+                  aria-label="iPod color"
+                  value={ipodColor}
+                  onChange={(e) => setIpodColor(e.target.value)}
+                />
+                <output>{ipodColor.toUpperCase()}</output>
+              </div>
+            </div>
             <label className="checkbox">
               <input
                 type="checkbox"

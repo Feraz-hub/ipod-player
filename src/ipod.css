@@ -26,6 +26,7 @@
   padding: 34px 38px;
   border-radius: 40px;
   border: 1px solid #b7b8b5;
+  border-color: color-mix(in srgb, var(--ipod-color, #c6cbc5), white 40%);
   background: linear-gradient(
     120deg,
     #d7d9d5,
@@ -33,6 +34,14 @@
     #e1e2db 49%,
     #bfc4bd 78%,
     #a9b1ab
+  );
+  background: linear-gradient(
+    120deg,
+    color-mix(in srgb, var(--ipod-color, #c6cbc5), white 30%),
+    color-mix(in srgb, var(--ipod-color, #c6cbc5), black 6%) 20%,
+    color-mix(in srgb, var(--ipod-color, #c6cbc5), white 48%) 49%,
+    color-mix(in srgb, var(--ipod-color, #c6cbc5), black 4%) 78%,
+    color-mix(in srgb, var(--ipod-color, #c6cbc5), black 15%)
   );
   box-shadow:
     inset 0 3px 3px #ffffffe0,

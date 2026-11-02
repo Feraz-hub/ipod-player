@@ -1164,7 +1164,7 @@ h1 + p,
   color: #adafc1;
   gap: 9px;
 }
-.dialog input:not([type="range"]):not([type="checkbox"]):not([type="file"]),
+.dialog input:not([type="range"]):not([type="checkbox"]):not([type="file"]):not([type="color"]),
 .dialog textarea,
 .dialog select {
   color: #dcdbe7;
@@ -1182,6 +1182,33 @@ h1 + p,
 }
 .dialog label:has(input[type="range"]) {
   margin: 25px 0;
+}
+.ipod-color-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 20px 0;
+  color: #adafc1;
+  font-size: 11px;
+}
+.ipod-color-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dialog input[type="color"] {
+  width: 52px;
+  height: 38px;
+  padding: 3px;
+  border: 1px solid #ffffff1b;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.ipod-color-picker output {
+  min-width: 62px;
+  color: var(--muted);
+  font: 11px var(--mono);
 }
 .dialog input[type="range"] {
   width: 100%;

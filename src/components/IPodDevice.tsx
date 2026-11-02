@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { Maximize2, Minimize2 } from "lucide-react";
 import "../ipod.css";
 
@@ -6,11 +12,13 @@ export default function IPodDevice({
   children,
   controls,
   caption,
+  shellColor,
   onInteract,
 }: {
   children: ReactNode;
   controls: ReactNode;
   caption: string;
+  shellColor: string;
   onInteract: () => unknown;
 }) {
   const screen = useRef<HTMLDivElement>(null);
@@ -28,6 +36,7 @@ export default function IPodDevice({
     <main className={`ipod-stage ${expanded ? "display-expanded" : ""}`}>
       <div
         className="ipod-body"
+        style={{ "--ipod-color": shellColor } as CSSProperties}
         aria-label="iPod music player"
         onPointerDownCapture={onInteract}
         onKeyDownCapture={onInteract}
