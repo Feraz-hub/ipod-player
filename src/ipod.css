@@ -42,16 +42,6 @@
     0 9px 0 #202c25,
     0 30px 55px #0009;
 }
-.ipod-hold {
-  position: absolute;
-  top: -4px;
-  right: 100px;
-  width: 42px;
-  height: 5px;
-  border-radius: 3px;
-  background: linear-gradient(90deg, #4b544d 55%, #df7e4077 55%);
-  box-shadow: 0 -1px 0 #c1c6bd;
-}
 .ipod-screen-bezel {
   min-width: 0;
   padding: 9px;

@@ -32,7 +32,6 @@ export default function IPodDevice({
         onPointerDownCapture={onInteract}
         onKeyDownCapture={onInteract}
       >
-        <div className="ipod-hold" aria-hidden="true" />
         <div className="ipod-screen-bezel">
           <div className="ipod-screen" ref={screen} aria-label="iPod display">
             <div
