@@ -129,6 +129,8 @@ export default function App() {
     [menuOpen, setMenuOpen] = useState(false),
     [chromeVisible, setChromeVisible] = useState(true);
   const audio = useRef<HTMLAudioElement | null>(null),
+    audioContext = useRef<AudioContext | null>(null),
+    audioGain = useRef<GainNode | null>(null),
     audioUrl = useRef(""),
     playTicket = useRef(0),
     keyHandler = useRef<(event: KeyboardEvent) => void>(() => {}),
@@ -258,6 +260,9 @@ export default function App() {
     const a = new Audio();
     a.preload = "auto";
     a.loop = false;
+    // Storage URLs are cross-origin. A media element must request CORS before
+    // entering a Web Audio graph or browsers output silence for that source.
+    a.crossOrigin = "anonymous";
     a.volume = volume;
     audio.current = a;
     const update = () => {
@@ -283,12 +288,16 @@ export default function App() {
       a.pause();
       a.removeAttribute("src");
       a.load();
+      void audioContext.current?.close();
+      audioContext.current = null;
+      audioGain.current = null;
       if (audioUrl.current) URL.revokeObjectURL(audioUrl.current);
       audio.current = null;
     };
   }, [notify]);
   useEffect(() => {
-    if (audio.current) audio.current.volume = volume;
+    if (audioGain.current) audioGain.current.gain.value = volume;
+    else if (audio.current) audio.current.volume = volume;
   }, [volume]);
   useEffect(() => {
     const persist = () => {
@@ -397,6 +406,27 @@ export default function App() {
     setLoading(true);
     try {
       const a = audio.current!;
+      if (!audioContext.current && typeof AudioContext !== "undefined") {
+        let context: AudioContext | null = null;
+        try {
+          context = new AudioContext();
+          const gain = context.createGain();
+          gain.gain.value = volume;
+          context
+            .createMediaElementSource(a)
+            .connect(gain)
+            .connect(context.destination);
+          a.volume = 1;
+          audioContext.current = context;
+          audioGain.current = gain;
+        } catch {
+          void context?.close();
+          a.volume = volume;
+        }
+      }
+      // Resume during the Play gesture, before any network request yields.
+      if (audioContext.current?.state === "suspended")
+        void audioContext.current.resume().catch(() => {});
       if (current?.id !== track.id || !a.src) {
         a.pause();
         const source = track.demo
