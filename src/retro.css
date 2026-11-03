@@ -68,6 +68,11 @@
   pointer-events: none;
   mask-image: linear-gradient(transparent, #000 30%, #000 75%, transparent);
 }
+.retro-player.is-paused .alley-image,
+.retro-player.is-paused .alley-haze,
+.retro-player.is-paused .alley-rain {
+  animation-play-state: paused;
+}
 .retro-scanlines {
   position: absolute;
   inset: 0;

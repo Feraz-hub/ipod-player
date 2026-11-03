@@ -151,13 +151,17 @@ export function paintScene(
 export default function Scene({
   scene = 0,
   still = false,
+  paused = false,
   className = "",
 }: {
   scene?: number;
   still?: boolean;
+  paused?: boolean;
   className?: string;
 }) {
-  const ref = useRef<HTMLCanvasElement>(null);
+  const ref = useRef<HTMLCanvasElement>(null),
+    elapsed = useRef(0),
+    previousFrame = useRef(0);
   useEffect(() => {
     const canvas = ref.current!;
     const ctx = canvas.getContext("2d")!;
@@ -165,26 +169,32 @@ export default function Scene({
       last = 0;
     const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
     const draw = (now: number) => {
-      if (now - last > 45 || still) {
+      const active = !still && !paused && !reduced;
+      if (active && previousFrame.current)
+        elapsed.current += (now - previousFrame.current) / 1000;
+      previousFrame.current = active ? now : 0;
+      if (now - last > 45 || still || paused || reduced) {
         const rect = canvas.getBoundingClientRect();
-        canvas.width = Math.min(1600, Math.max(480, rect.width));
-        canvas.height = Math.max(
+        const width = Math.round(Math.min(1600, Math.max(480, rect.width)));
+        const height = Math.max(
           270,
-          canvas.width * (rect.height / Math.max(1, rect.width)),
+          Math.round(width * (rect.height / Math.max(1, rect.width))),
         );
+        if (canvas.width !== width) canvas.width = width;
+        if (canvas.height !== height) canvas.height = height;
         paintScene(
           ctx,
           canvas.width,
           canvas.height,
-          still || reduced ? 0 : now / 1000,
+          still || reduced ? 0 : elapsed.current,
           scene,
         );
         last = now;
       }
-      if (!still && !reduced) frame = requestAnimationFrame(draw);
+      if (active) frame = requestAnimationFrame(draw);
     };
     frame = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frame);
-  }, [scene, still]);
+  }, [scene, still, paused]);
   return <canvas ref={ref} className={className} aria-hidden="true" />;
 }

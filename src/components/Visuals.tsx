@@ -112,7 +112,7 @@ export default function Visuals({
               }
             />
           ) : (
-            <Scene scene={l.clip.scene || 0} />
+            <Scene scene={l.clip.scene || 0} paused={paused} />
           )}
         </div>
       ))}

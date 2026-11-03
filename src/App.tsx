@@ -135,6 +135,8 @@ export default function App() {
     gain = useRef<GainNode | null>(null),
     audioUrl = useRef(""),
     playTicket = useRef(0),
+    keyHandler = useRef<(event: KeyboardEvent) => void>(() => {}),
+    endedHandler = useRef<() => void>(() => {}),
     restore = useRef<{ id?: string; position?: number } | null>(null),
     latest = useRef({
       current,
@@ -151,6 +153,14 @@ export default function App() {
     stateReady = useRef(false),
     accountId = useRef<string | null>(null),
     refreshTicket = useRef(0);
+  const stopPlayback = useCallback(() => {
+    playTicket.current++;
+    audio.current?.pause();
+    const context = ctx.current;
+    if (context?.state === "running") void context.suspend().catch(() => {});
+    setPlaying(false);
+    setLoading(false);
+  }, []);
   latest.current = {
     current,
     position,
@@ -217,10 +227,8 @@ export default function App() {
       const nextId = session?.user.id || null;
       if (nextId === accountId.current) return;
       accountId.current = nextId;
-      playTicket.current++;
-      setLoading(false);
+      stopPlayback();
       setUser(session?.user || null);
-      audio.current?.pause();
       setCinema(false);
       setCurrent(null);
       setMod(false);
@@ -239,10 +247,11 @@ export default function App() {
       clearInterval(clockTimer);
       subscription?.data.subscription.unsubscribe();
     };
-  }, [refresh, notify]);
+  }, [refresh, notify, stopPlayback]);
   useEffect(() => {
     const a = new Audio();
     a.preload = "metadata";
+    a.loop = false;
     audio.current = a;
     const update = () => {
       setPosition(a.currentTime);
@@ -452,9 +461,8 @@ export default function App() {
     }
   }
   function togglePlay() {
-    if (playing) {
-      audio.current?.pause();
-      setPlaying(false);
+    if (playing || loading) {
+      stopPlayback();
     } else void start(cinema ? current || highlighted : highlighted);
   }
   function next(direction = 1) {
@@ -466,16 +474,17 @@ export default function App() {
     setSelected(index);
     void start(tracks[index]);
   }
+  endedHandler.current = () => {
+    if (repeat) {
+      if (audio.current) audio.current.currentTime = 0;
+      void start(current || undefined);
+    } else next();
+  };
   useEffect(() => {
-    const ended = () => {
-      if (repeat) {
-        if (audio.current) audio.current.currentTime = 0;
-        void start(current || undefined);
-      } else next();
-    };
+    const ended = () => endedHandler.current();
     window.addEventListener("nightshift-ended", ended);
     return () => window.removeEventListener("nightshift-ended", ended);
-  });
+  }, []);
   function rotate(delta: number) {
     if (cinema || (menuOpen && view === "library") || tracks.length > 1)
       wheelSound.beep();
@@ -500,55 +509,56 @@ export default function App() {
       setMenuIndex(0);
     }
   }
+  keyHandler.current = (e: KeyboardEvent) => {
+    const target = e.target as HTMLElement;
+    if (
+      target.closest("input,textarea,select,dialog") ||
+      e.ctrlKey ||
+      e.metaKey ||
+      e.altKey
+    )
+      return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (cinema)
+        setVolume((v) => clamp(v + (e.key === "ArrowUp" ? 0.035 : -0.035)));
+      else rotate(e.key === "ArrowDown" ? 1 : -1);
+    }
+    if (e.key === "Enter" && !target.closest("button,a")) {
+      e.preventDefault();
+      selectHighlighted();
+    }
+    if (e.code === "Space" && !target.closest("button")) {
+      e.preventDefault();
+      togglePlay();
+    }
+    if (e.key === "Escape") back();
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      if (cinema && audio.current)
+        audio.current.currentTime = Math.min(duration, position + 5);
+      else rotate(1);
+    }
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      if (cinema && audio.current)
+        audio.current.currentTime = Math.max(0, position - 5);
+      else rotate(-1);
+    }
+    if (e.key === "+" || e.key === "=") setVolume((v) => clamp(v + 0.05));
+    if (e.key === "-") setVolume((v) => clamp(v - 0.05));
+  };
   useEffect(() => {
-    const key = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (
-        target.closest("input,textarea,select,dialog") ||
-        e.ctrlKey ||
-        e.metaKey ||
-        e.altKey
-      )
-        return;
-      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-        e.preventDefault();
-        if (cinema)
-          setVolume((v) => clamp(v + (e.key === "ArrowUp" ? 0.035 : -0.035)));
-        else rotate(e.key === "ArrowDown" ? 1 : -1);
-      }
-      if (e.key === "Enter" && !target.closest("button,a")) {
-        e.preventDefault();
-        selectHighlighted();
-      }
-      if (e.code === "Space" && !target.closest("button")) {
-        e.preventDefault();
-        togglePlay();
-      }
-      if (e.key === "Escape") back();
-      if (e.key === "ArrowRight") {
-        e.preventDefault();
-        if (cinema && audio.current)
-          audio.current.currentTime = Math.min(duration, position + 5);
-        else rotate(1);
-      }
-      if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        if (cinema && audio.current)
-          audio.current.currentTime = Math.max(0, position - 5);
-        else rotate(-1);
-      }
-      if (e.key === "+" || e.key === "=") setVolume((v) => clamp(v + 0.05));
-      if (e.key === "-") setVolume((v) => clamp(v - 0.05));
-    };
+    const key = (e: KeyboardEvent) => keyHandler.current(e);
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  });
+  }, []);
   async function remove(m: Media) {
     try {
       if (m.local) await deleteLocal(m.id);
       else await api("delete", { id: m.id });
       if (current?.id === m.id) {
-        audio.current?.pause();
+        stopPlayback();
         setCurrent(null);
         setCinema(false);
       }
@@ -680,7 +690,9 @@ export default function App() {
       }
     >
       <div
-        className={`app retro-player ${cinema ? "is-cinema" : ""} ${chromeVisible ? "chrome-visible" : ""}`}
+        className={`app retro-player ${cinema ? "is-cinema" : ""} ${
+          cinema && !playing ? "is-paused" : ""
+        } ${chromeVisible ? "chrome-visible" : ""}`}
         onPointerMove={() => {
           if (cinema) revealChrome();
         }}
@@ -936,7 +948,7 @@ export default function App() {
                     href="https://gkids.com/studio-ghibli/trailers/"
                     target="_blank"
                     rel="noreferrer"
-                    onClick={() => audio.current?.pause()}
+                    onClick={stopPlayback}
                   >
                     <Scene scene={4} still />
                     <div>
