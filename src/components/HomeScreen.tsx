@@ -26,8 +26,9 @@ export default function HomeScreen() {
         clips need a connection.
       </p>
       <p className="small muted">
-        For your account library, sign in from the Home Screen app and upload
-        there. Device-only imports in Safari may have separate storage.
+        Sign in with the same account on your laptop and Home Screen app to see
+        your private uploads on both. Device-only imports stay in their own
+        browser and do not sync.
       </p>
     </div>
   );

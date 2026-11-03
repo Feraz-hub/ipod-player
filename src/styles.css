@@ -1440,6 +1440,23 @@ kbd {
   overflow: auto;
   margin-bottom: 24px;
 }
+.auth-methods {
+  display: flex;
+  gap: 8px;
+  margin: 18px 0;
+}
+.auth-methods button {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid #ffffff24;
+  border-radius: 8px;
+  color: #b7bcb8;
+}
+.auth-methods button.active {
+  border-color: #b7e4c2;
+  color: #d8f3df;
+  background: #b7e4c21c;
+}
 .account-uploads > div {
   display: flex;
   align-items: center;

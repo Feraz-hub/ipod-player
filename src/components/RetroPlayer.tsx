@@ -337,11 +337,15 @@ export function RetroStatus({
   date,
   cinema,
   visible,
+  accountEmail,
+  onAccount,
   onBack,
 }: {
   date: Date;
   cinema: boolean;
   visible: boolean;
+  accountEmail?: string;
+  onAccount: () => void;
   onBack: () => void;
 }) {
   const clock = date
@@ -362,6 +366,14 @@ export function RetroStatus({
       >
         {cinema ? <ArrowLeft size={20} /> : <Music2 size={17} />}
       </button>
+      <button
+        className={`retro-account-status ${accountEmail ? "connected" : ""}`}
+        onClick={onAccount}
+        aria-label={accountEmail ? `Signed in as ${accountEmail}` : "Sign in to sync music"}
+      >
+        <span className="retro-account-dot" />
+        {accountEmail ? "ACCOUNT ON" : "SIGN IN"}
+      </button>
       <span>
         {date.getMonth() + 1}/{date.getDate()} {clock}
         <BatteryFull size={25} aria-label="Device-style battery indicator" />
@@ -381,6 +393,7 @@ type DockProps = {
   onSearch: () => void;
   onCommunity: () => void;
   onAccount: () => void;
+  accountEmail?: string;
   onSettings: () => void;
   onFullscreen: () => void;
   onTrailers: () => void;
@@ -421,7 +434,12 @@ export function RetroDock(p: DockProps) {
       >
         <Wifi size={21} />
       </button>
-      <button aria-label="My account" title="Account" onClick={p.onAccount}>
+      <button
+        className={p.accountEmail ? "account-connected" : ""}
+        aria-label={p.accountEmail ? `Signed in as ${p.accountEmail}` : "Sign in to sync music"}
+        title={p.accountEmail ? `Signed in as ${p.accountEmail}` : "Sign in to sync music"}
+        onClick={p.onAccount}
+      >
         <MessageCircle size={21} fill="currentColor" />
       </button>
       <button

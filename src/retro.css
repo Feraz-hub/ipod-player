@@ -115,6 +115,41 @@
   color: #c2cbbf;
   filter: blur(0.14px);
 }
+.retro-account-status {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #aeb7aa;
+  font: 10px var(--mono);
+  letter-spacing: .07em;
+  pointer-events: auto;
+  opacity: .8;
+}
+.retro-account-status.connected { color: #b9e4c4; }
+.retro-account-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #777f78;
+}
+.retro-account-status.connected .retro-account-dot,
+.retro-dock .account-connected::after {
+  background: #8ce0a4;
+  box-shadow: 0 0 8px #8ce0a4;
+}
+.retro-dock .account-connected { position: relative; color: #b9e4c4; }
+.retro-dock .account-connected::after {
+  content: "";
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  right: 6px;
+  top: 5px;
+  border-radius: 50%;
+}
 .retro-back {
   padding: 6px;
   color: #aeb7aa;
@@ -1022,6 +1057,8 @@
   }
 }
 @media (max-width: 600px) {
+  .retro-account-status { font-size: 8px; gap: 4px; }
+  .retro-account-dot { width: 5px; height: 5px; }
   .retro-status {
     top: 17px;
     left: 14px;

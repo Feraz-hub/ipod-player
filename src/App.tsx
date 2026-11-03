@@ -223,7 +223,7 @@ export default function App() {
         stateReady.current = true;
       });
     void refresh();
-    const subscription = cloud?.auth.onAuthStateChange((_event, session) => {
+    const subscription = cloud?.auth.onAuthStateChange((event, session) => {
       const nextId = session?.user.id || null;
       if (nextId === accountId.current) return;
       accountId.current = nextId;
@@ -234,13 +234,22 @@ export default function App() {
       setMod(false);
       setModView(false);
       setMedia((old) => old.filter((m) => m.local));
-      void refresh();
-      if (session)
-        void api("me")
-          .then((d) => {
-            if (accountId.current === nextId) setMod(d.moderator);
-          })
-          .catch((e) => notify(errorText(e)));
+      if (event === "SIGNED_IN") {
+        setModal("auth");
+        notify(`Signed in as ${session?.user.email || "your account"}. Your account library is syncing.`);
+      }
+      // Auth callbacks run under Supabase's session lock. Start API calls
+      // after the callback returns so getSession() cannot wait on that lock.
+      setTimeout(() => {
+        if (accountId.current !== nextId) return;
+        void refresh();
+        if (session)
+          void api("me")
+            .then((d) => {
+              if (accountId.current === nextId) setMod(d.moderator);
+            })
+            .catch((e) => notify(errorText(e)));
+      }, 0);
     });
     return () => {
       clearTimeout(t);
@@ -719,6 +728,8 @@ export default function App() {
           date={clock}
           cinema={cinema}
           visible={chromeVisible}
+          accountEmail={user?.email}
+          onAccount={() => setModal("auth")}
           onBack={() => {
             if (cinema) back();
             else setMenuOpen((v) => !v);
@@ -1021,6 +1032,7 @@ export default function App() {
           }}
           onCommunity={() => chooseView("community")}
           onAccount={() => setModal("auth")}
+          accountEmail={user?.email}
           onSettings={() => setModal("settings")}
           onFullscreen={() => void fullscreen()}
           onTrailers={() => chooseView("trailers")}
@@ -1396,10 +1408,51 @@ function Account({
   storage: Usage;
 }) {
   const [email, setEmail] = useState(""),
+    [password, setPassword] = useState(""),
+    [confirmPassword, setConfirmPassword] = useState(""),
+    [authMode, setAuthMode] = useState<"password" | "link">("password"),
     [code, setCode] = useState(""),
     [busy, setBusy] = useState(false),
     [sent, setSent] = useState(false),
+    [passwordSaved, setPasswordSaved] = useState(false),
     [error, setError] = useState("");
+  async function passwordSignIn(e: React.FormEvent) {
+    e.preventDefault();
+    if (!cloud) return;
+    setBusy(true);
+    setError("");
+    try {
+      const { error } = await cloud.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      setPassword("");
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function savePassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!cloud) return;
+    if (password !== confirmPassword) {
+      setError("The passwords do not match.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const { error } = await cloud.auth.updateUser({ password });
+      if (error) throw error;
+      setPassword("");
+      setConfirmPassword("");
+      setPasswordSaved(true);
+      notify("Password saved. You can now sign in on your other devices.");
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  }
   async function signIn(e: React.FormEvent) {
     e.preventDefault();
     if (!cloud) return;
@@ -1497,6 +1550,40 @@ function Account({
               </p>
             )}
           </div>
+          <h3>Sign in on any device</h3>
+          <p className="muted small">
+            Set a password for this account, then use the same email and password
+            in the player on your phone. Your private uploads will appear there.
+          </p>
+          <form onSubmit={savePassword}>
+            <label>
+              New password
+              <input
+                type="password"
+                autoComplete="new-password"
+                minLength={8}
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </label>
+            <label>
+              Confirm new password
+              <input
+                type="password"
+                autoComplete="new-password"
+                minLength={8}
+                required
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+            </label>
+            {error && <p className="form-error" role="alert">{error}</p>}
+            {passwordSaved && <p role="status">Password saved for this account.</p>}
+            <button className="primary full" disabled={busy}>
+              {busy ? "Saving…" : "Set account password"}
+            </button>
+          </form>
           <button
             className="outline full"
             onClick={() =>
@@ -1512,17 +1599,36 @@ function Account({
       ) : cloud ? (
         <>
           <p className="muted">
-            Sign in with an email link. Your uploaded music stays private,
-            wherever the night takes you.
+            Sign in to your private library. Music uploaded to your account on
+            one device appears on your other devices too.
           </p>
-          {sent ? (
+          <div className="auth-methods">
+            <button type="button" className={authMode === "password" ? "active" : ""} onClick={() => { setAuthMode("password"); setError(""); }}>Password</button>
+            <button type="button" className={authMode === "link" ? "active" : ""} onClick={() => { setAuthMode("link"); setError(""); }}>Email link</button>
+          </div>
+          {authMode === "password" ? (
+            <form onSubmit={passwordSignIn}>
+              <label>
+                Email address
+                <input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+              </label>
+              <label>
+                Password
+                <input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+              </label>
+              {error && <p role="alert" className="form-error">{error}</p>}
+              <button className="primary full" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
+              <p className="small muted">First time here? Choose Email link, confirm your email, then set a password in My account.</p>
+            </form>
+          ) : sent ? (
             <div className="sent-state">
               <Check size={30} />
               <h3>Check your inbox.</h3>
               <p>
                 Open the email sent to {email}. On your Home Screen app, hold
                 its confirmation or Sign in button, choose Copy Link, then paste
-                it below to finish signing in here.
+                it below to finish signing in here. Opening the link in a
+                different browser signs in that browser instead.
               </p>
               <form onSubmit={verifyCode}>
                 <label>
@@ -1562,6 +1668,7 @@ function Account({
             </div>
           ) : (
             <form onSubmit={signIn}>
+              <p className="small muted">The email link needs to open in this player, or be pasted here after sending. A different browser has a separate sign-in.</p>
               <label>
                 Email address
                 <input
