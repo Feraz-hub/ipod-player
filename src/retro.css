@@ -244,6 +244,12 @@
     0 0 28px #b5cdcc1c,
     0 4px 18px #0006;
 }
+.retro-song-select .cover.fallback-cover {
+  filter: saturate(0.55) brightness(0.55) contrast(1.08);
+}
+.retro-song.selected .cover.fallback-cover {
+  filter: saturate(0.7) brightness(0.7) contrast(1.08);
+}
 .retro-song-label {
   display: flex;
   flex-direction: column;

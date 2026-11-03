@@ -8,7 +8,6 @@ import {
   ChevronRight,
   Disc3,
   Film,
-  Github,
   Headphones,
   HelpCircle,
   LoaderCircle,
@@ -45,7 +44,7 @@ import {
   saveLocal,
   setSetting,
 } from "./lib/local";
-import { clamp, STORAGE_CAP } from "./lib/rules.mjs";
+import { clamp, CLOUD_CHUNK, STORAGE_CAP } from "./lib/rules.mjs";
 import { createDemoAudio } from "./lib/audio";
 import useWheelSound from "./lib/useWheelSound";
 import ClickWheel from "./components/ClickWheel";
@@ -55,7 +54,6 @@ import Dialog from "./components/Dialog";
 import Scene from "./components/Scene";
 import UploadDialog from "./components/Upload";
 import HomeScreen from "./components/HomeScreen";
-import { signInToken } from "./lib/sign-in-link.mjs";
 import Visuals from "./components/Visuals";
 import {
   AlleyBackground,
@@ -179,7 +177,10 @@ export default function App() {
     setSyncing(true);
     try {
       const local = await localLibrary();
-      if (ticket === refreshTicket.current) setMedia(local);
+      if (ticket === refreshTicket.current) {
+        setMedia(local);
+        setLoaded(true);
+      }
       const remote = cloud ? await listCloud() : [];
       if (ticket !== refreshTicket.current) return;
       setMedia([...local, ...remote]);
@@ -202,7 +203,7 @@ export default function App() {
     }
   }, [notify]);
   useEffect(() => {
-    const t = setTimeout(() => setBoot(false), 1500);
+    const t = setTimeout(() => setBoot(false), 350);
     const clockTimer = setInterval(() => setClock(new Date()), 30000);
     void getSetting("player")
       .then((s) => {
@@ -259,7 +260,7 @@ export default function App() {
   }, [refresh, notify, stopPlayback]);
   useEffect(() => {
     const a = new Audio();
-    a.preload = "metadata";
+    a.preload = "auto";
     a.loop = false;
     audio.current = a;
     const update = () => {
@@ -432,14 +433,16 @@ export default function App() {
       const a = audio.current!;
       if (current?.id !== track.id || !a.src) {
         a.pause();
-        const blob = track.demo
+        const source = track.demo
           ? await createDemoAudio(track.scene || 0)
-          : track.blob || (await api(`stream/${track.id}`));
+          : track.blob || (track.size <= CLOUD_CHUNK && track.kind === "music"
+              ? (await api("stream-url", { id: track.id })).url as string
+              : await api(`stream/${track.id}`));
         if (ticket !== playTicket.current) return;
-        const nextUrl = URL.createObjectURL(blob);
+        const nextUrl = typeof source === "string" ? source : URL.createObjectURL(source);
         a.src = nextUrl;
         const old = audioUrl.current;
-        audioUrl.current = nextUrl;
+        audioUrl.current = typeof source === "string" ? "" : nextUrl;
         if (old) URL.revokeObjectURL(old);
         setCurrent(track);
         setDuration(track.duration);
@@ -694,6 +697,18 @@ export default function App() {
           onMenu={back}
           onPrevious={() => (cinema ? next(-1) : rotate(-1))}
           onNext={() => (cinema ? next() : rotate(1))}
+          onSeekBack={() => {
+            if (audio.current?.src) {
+              audio.current.currentTime = Math.max(0, audio.current.currentTime - 10);
+              setPosition(audio.current.currentTime);
+            }
+          }}
+          onSeekForward={() => {
+            if (audio.current?.src) {
+              audio.current.currentTime = Math.min(duration || Infinity, audio.current.currentTime + 10);
+              setPosition(audio.current.currentTime);
+            }
+          }}
           onPlay={togglePlay}
         />
       }
@@ -1410,10 +1425,7 @@ function Account({
   const [email, setEmail] = useState(""),
     [password, setPassword] = useState(""),
     [confirmPassword, setConfirmPassword] = useState(""),
-    [authMode, setAuthMode] = useState<"password" | "link">("password"),
-    [code, setCode] = useState(""),
     [busy, setBusy] = useState(false),
-    [sent, setSent] = useState(false),
     [passwordSaved, setPasswordSaved] = useState(false),
     [error, setError] = useState("");
   async function passwordSignIn(e: React.FormEvent) {
@@ -1447,66 +1459,6 @@ function Account({
       setConfirmPassword("");
       setPasswordSaved(true);
       notify("Password saved. You can now sign in on your other devices.");
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function signIn(e: React.FormEvent) {
-    e.preventDefault();
-    if (!cloud) return;
-    setBusy(true);
-    setError("");
-    try {
-      const { error } = await cloud.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: location.origin + import.meta.env.BASE_URL,
-        },
-      });
-      if (error) throw error;
-      setSent(true);
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function githubSignIn() {
-    if (!cloud) return;
-    setBusy(true);
-    setError("");
-    try {
-      const { error } = await cloud.auth.signInWithOAuth({
-        provider: "github",
-        options: { redirectTo: location.origin + import.meta.env.BASE_URL },
-      });
-      if (error) throw error;
-    } catch (e) {
-      setError(errorText(e));
-      setBusy(false);
-    }
-  }
-  async function verifyCode(e: React.FormEvent) {
-    e.preventDefault();
-    if (!cloud) return;
-    setBusy(true);
-    setError("");
-    try {
-      const value = code.trim();
-      const { error } = await cloud.auth.verifyOtp(
-        value.startsWith("https:")
-          ? (() => {
-              const verified = signInToken(
-                value,
-                import.meta.env.VITE_SUPABASE_URL,
-              );
-              return { token_hash: verified.token, type: verified.type };
-            })()
-          : { email, token: value.replace(/\s/g, ""), type: "email" },
-      );
-      if (error) throw error;
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -1602,12 +1554,7 @@ function Account({
             Sign in to your private library. Music uploaded to your account on
             one device appears on your other devices too.
           </p>
-          <div className="auth-methods">
-            <button type="button" className={authMode === "password" ? "active" : ""} onClick={() => { setAuthMode("password"); setError(""); }}>Password</button>
-            <button type="button" className={authMode === "link" ? "active" : ""} onClick={() => { setAuthMode("link"); setError(""); }}>Email link</button>
-          </div>
-          {authMode === "password" ? (
-            <form onSubmit={passwordSignIn}>
+          <form onSubmit={passwordSignIn}>
               <label>
                 Email address
                 <input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
@@ -1618,89 +1565,7 @@ function Account({
               </label>
               {error && <p role="alert" className="form-error">{error}</p>}
               <button className="primary full" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
-              <p className="small muted">First time here? Choose Email link, confirm your email, then set a password in My account.</p>
-            </form>
-          ) : sent ? (
-            <div className="sent-state">
-              <Check size={30} />
-              <h3>Check your inbox.</h3>
-              <p>
-                Open the email sent to {email}. On your Home Screen app, hold
-                its confirmation or Sign in button, choose Copy Link, then paste
-                it below to finish signing in here. Opening the link in a
-                different browser signs in that browser instead.
-              </p>
-              <form onSubmit={verifyCode}>
-                <label>
-                  Sign-in link or code
-                  <input
-                    autoComplete="off"
-                    autoCapitalize="none"
-                    spellCheck={false}
-                    required
-                    maxLength={3000}
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                    placeholder="Paste the link from your email"
-                  />
-                </label>
-                {error && (
-                  <p className="form-error" role="alert">
-                    {error}
-                  </p>
-                )}
-                <button className="primary full" disabled={busy}>
-                  {busy ? "Signing in…" : "Sign in"}
-                </button>
-                <button
-                  className="outline full"
-                  type="button"
-                  disabled={busy}
-                  onClick={() => {
-                    setSent(false);
-                    setCode("");
-                    setError("");
-                  }}
-                >
-                  Use a different email
-                </button>
-              </form>
-            </div>
-          ) : (
-            <form onSubmit={signIn}>
-              <p className="small muted">The email link needs to open in this player, or be pasted here after sending. A different browser has a separate sign-in.</p>
-              <label>
-                Email address
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  placeholder="you@example.com"
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </label>
-              {error && (
-                <p role="alert" className="form-error">
-                  {error}
-                </p>
-              )}
-              <button className="primary full" disabled={busy}>
-                {busy ? "Sending…" : "Send me a sign-in link"}
-                <ArrowUpRight size={16} />
-              </button>
-              {import.meta.env.VITE_GITHUB_AUTH_ENABLED === "true" && (
-                <button
-                  className="outline full"
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void githubSignIn()}
-                >
-                  <Github size={16} />
-                  Continue with GitHub
-                </button>
-              )}
-            </form>
-          )}
+          </form>
         </>
       ) : (
         <>

@@ -109,6 +109,19 @@ const admin = {
         events.push("download");
         return { data: objects.get(`${bucket}/${path}`), error: null };
       },
+      info: async (path) => {
+        const object = objects.get(`${bucket}/${path}`);
+        return object
+          ? { data: { size: object.size }, error: null }
+          : { data: null, error: { message: "not found" } };
+      },
+      createSignedUrl: async (path, seconds) => {
+        events.push("signed-url");
+        return {
+          data: { signedUrl: `https://test.supabase.co/storage/v1/object/sign/${bucket}/${path}?expires=${seconds}` },
+          error: null,
+        };
+      },
       upload: async (path, bytes) => {
         events.push("upload");
         objects.set(`${bucket}/${path}`, new Blob([bytes]));
@@ -146,7 +159,7 @@ const source = (
 ).replace(
   /import \{ createClient \} from "npm:@supabase\/supabase-js@2";/,
   "const createClient=globalThis.__nightshiftTestClient;",
-);
+).replace("const CHUNK_SIZE = 40_000_000;", "const CHUNK_SIZE = 4;");
 const js = ts.transpile(source, {
   target: ts.ScriptTarget.ES2022,
   module: ts.ModuleKind.ESNext,
@@ -224,6 +237,17 @@ test("gateway rejects private music for guests, other accounts and clip moderato
   assert.equal(await response.text(), "song");
   assert.ok(events.indexOf("rpc:reserve_stream") < events.indexOf("download"));
 });
+test("private music gets a short lived streaming URL only for its owner", async () => {
+  const request = (user) => call("stream-url", { user, method: "POST", body: { id: songId } });
+  assert.equal((await request(undefined)).status, 401);
+  assert.equal((await request(bob)).status, 400);
+  assert.ok(!events.includes("signed-url"));
+  const response = await request(alice);
+  assert.equal(response.status, 200);
+  const data = await response.json();
+  assert.match(data.url, /private-music/);
+  assert.ok(events.indexOf("rpc:reserve_stream") < events.indexOf("signed-url"));
+});
 test("public clips must be approved and response contains media rather than a storage URL", async () => {
   assert.equal((await call(`stream/${clipId}`)).status, 400);
   tables.media[1].status = "approved";
@@ -297,6 +321,28 @@ test("upload claims are atomic and mismatched sizes cannot be stored", async () 
     400,
   );
   assert.equal(events.filter((e) => e === "upload").length, 1);
+});
+test("multipart upload stays private until complete and streams in order", async () => {
+  tables.media[0].size = 9;
+  tables.media[0].status = "reserved";
+  objects.clear();
+  for (const [part, bytes] of ["abcd", "efgh", "i"].entries()) {
+    const response = await call(`upload/${songId}/${part}`, {
+      method: "PUT", user: alice, body: bytes, raw: true,
+    });
+    assert.equal(response.status, 200);
+    assert.equal(tables.media[0].status, part === 2 ? "private" : "uploading");
+  }
+  assert.equal((await call("complete", {
+    method: "POST", user: alice, body: { id: songId },
+  })).status, 200);
+  const response = await call(`stream/${songId}`, { user: alice });
+  assert.equal(response.status, 200);
+  assert.equal(await response.text(), "abcdefghi");
+  assert.equal((await call("delete", {
+    method: "POST", user: alice, body: { id: songId },
+  })).status, 200);
+  assert.equal(objects.size, 0);
 });
 test("sharing requires a verified user and explicit rights confirmation", async () => {
   assert.equal(

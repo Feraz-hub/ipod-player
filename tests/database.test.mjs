@@ -25,6 +25,10 @@ await db.exec(
     "-- gen_random_uuid is built into this test Postgres.",
   ),
 );
+await db.exec(await readFile(
+  new URL("../supabase/migrations/202611030001_allow_100mb_media.sql", import.meta.url),
+  "utf8",
+));
 const reserve = async (owner, extra = {}) =>
   (
     await db.query("select * from public.reserve_media($1,$2)", [
@@ -40,6 +44,17 @@ const reserve = async (owner, extra = {}) =>
       }),
     ])
   ).rows[0];
+test("a logical media file can be 100 MB but no larger", async () => {
+  const item = await reserve(alice, { size: 100_000_000 });
+  assert.equal(Number(item.size), 100_000_000);
+  await assert.rejects(
+    reserve(alice, { size: 100_000_001 }),
+    /100 MB/,
+  );
+  await db.query("select public.reserve_stream($1)", [100_000_000]);
+  await db.exec("delete from public.bandwidth_ledger");
+  await db.query("delete from public.media where id=$1", [item.id]);
+});
 async function asUser(role, id, query, params = []) {
   await db.exec(
     `set role ${role}; select set_config('request.jwt.claim.sub','${id || ""}',false);`,

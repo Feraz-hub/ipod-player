@@ -13,7 +13,7 @@ test("rejects empty, oversized and disguised unsupported uploads", () => {
   );
   assert.throws(
     () => validateFile({ size: MAX_FILE + 1, type: "video/mp4" }, "clip"),
-    /40 MB/,
+    /100 MB/,
   );
   assert.throws(
     () => validateFile({ size: 500, type: "text/html" }, "clip"),

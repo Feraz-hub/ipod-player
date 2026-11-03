@@ -1,13 +1,33 @@
+import { useState } from "react";
+
 export default function Cover({
   index = 0,
+  seed,
   src,
   className = "",
 }: {
   index?: number;
+  seed?: string;
   src?: string;
   className?: string;
 }) {
+  const [imageFailed, setImageFailed] = useState(false);
   if (src) return <img className={`cover ${className}`} src={src} alt="" />;
+  let hash = 2166136261;
+  for (const character of seed || String(index)) {
+    hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
+  }
+  const number = (hash >>> 0) % 20 + 1;
+  if (!imageFailed) return (
+    <img
+      className={`cover fallback-cover ${className}`}
+      src={`${import.meta.env.BASE_URL}covers/fallback-${String(number).padStart(2, "0")}.jpg`}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      onError={() => setImageFailed(true)}
+    />
+  );
   const palettes = [
     ["#1a2540", "#b1abc5", "#a95767"],
     ["#513645", "#c9bcb0", "#c48478"],

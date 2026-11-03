@@ -19,7 +19,7 @@ npm run build
 npm run preview
 ```
 
-`npm test` runs 20 checks: real PostgreSQL migration and row-level access tests using PGlite, the actual Edge handler against a mocked Auth/Storage transport, upload validation, wheel boundary cases, video manifest/license/SD-source consistency, project-path/offline-cache privacy checks, and Home Screen email-link validation. No Supabase account is required for these tests. Hosted Auth, Storage and Edge Functions still need the live setup and acceptance check below.
+`npm test` runs database, gateway, upload, controls, media-source, offline-cache and Home Screen checks. No Supabase account is required for these tests. Hosted Auth, Storage and Edge Functions still need live acceptance checks.
 
 ## iPhone Home Screen
 
@@ -37,7 +37,7 @@ Keep original music files or an independent backup. No free hosted service can g
 
 ## Controls
 
-The wheel is always visible outside the display. Circular dragging, scrolling over the ring, or arrow keys moves the highlighted song. Press its center to select. MENU opens the Music menu; rotate to highlight All tracks, Favorites, demos, uploads, shuffle, repeat, community, account, settings, trailers or help, then press the center. MENU closes the menu or returns from playback to browsing. The left/right buttons move selection while browsing and skip tracks during playback. The bottom button plays or pauses. During playback, wheel rotation changes music volume, shown below the ring. The `W` key or the display's disc icon focuses the controls. On desktop, the body corner button enlarges the display while keeping the wheel beside it. Moving the pointer or tapping brings playback controls back. The magnifier opens search, Wi-Fi opens community clips, and the speech bubble opens your account.
+The wheel is always visible outside the display. Circular dragging, scrolling over the ring, or arrow keys moves the highlighted song. Press its center to select. MENU opens the Music menu; rotate to highlight All tracks, Favorites, demos, uploads, shuffle, repeat, community, account, settings, trailers or help, then press the center. MENU closes the menu or returns from playback to browsing. The left/right buttons move selection while browsing and skip tracks during playback. Hold left/right for half a second to seek 10 seconds. The bottom button plays or pauses. During playback, wheel rotation changes music volume, shown below the ring. The `W` key or the display's disc icon focuses the controls. On desktop, the body corner button enlarges the display while keeping the wheel beside it. Moving the pointer or tapping brings playback controls back. The magnifier opens search, Wi-Fi opens community clips, and the speech bubble opens your account.
 
 | Input                                   | Browse                          | Playback                     |
 | --------------------------------------- | ------------------------------- | ---------------------------- |
@@ -45,6 +45,7 @@ The wheel is always visible outside the display. Circular dragging, scrolling ov
 | Center                                  | Play selected track             | Play / pause                 |
 | Top / MENU                              | Return to library               | Return to library            |
 | Left / right wheel buttons              | Previous / next selection       | Previous / next track        |
+| Hold left / right wheel button           | —                               | Seek back / forward 10 sec   |
 | Bottom wheel button                     | Play                            | Play / pause                 |
 | Keyboard ↑ / ↓                          | Move selection                  | Volume up / down             |
 | Enter                                   | Play selection                  | Native focused button action |
@@ -55,7 +56,7 @@ The wheel is always visible outside the display. Circular dragging, scrolling ov
 
 Touch gestures use the same circular motion. Player gain uses Web Audio `MediaElementAudioSourceNode → GainNode → destination`, with smooth gain ramps. The phone's system volume is not changed. The video element is always muted. Motion is reduced when the operating system requests it. Browser full-screen is optional and may be unavailable in embedded or mobile browsers.
 
-The highlighted song smoothly grows larger than neighboring rows, including its artwork, title and artist. Short synthesized beeps mark wheel steps and menu selections. Sounds unlock after the first pointer/key interaction and can be disabled with **Settings → Wheel sounds**; this preference is saved in the browser. No external sound files or audio service are needed.
+The highlighted song smoothly grows larger than neighboring rows, including its artwork, title and artist. Songs without embedded artwork receive one of 20 locally hosted dark stills from the licensed scene collection; each song keeps the same fallback image across visits. Sources are recorded in `public/covers/SOURCES.json`. Short synthesized beeps mark wheel steps and menu selections. Sounds unlock after the first pointer/key interaction and can be disabled with **Settings → Wheel sounds**; this preference is saved in the browser. No external sound files or audio service are needed.
 
 ## Connect Supabase Free
 
@@ -84,12 +85,8 @@ The hosted player is connected to a dedicated Nightshift iPod Supabase Free proj
 
 6. Copy `.env.example` to `.env.local`. Fill in the project URL and its **public publishable/anon key**. Leave `VITE_BASE_PATH=/` for local development. Restart Vite after changing the file.
 7. In **Authentication → URL Configuration**, set the Site URL to the future site URL. Add both localhost URLs and the exact future Pages URL as allowed redirect URLs, for example `https://YOUR_USERNAME.github.io/YOUR_REPOSITORY/`.
-8. Enable Email auth. The app offers password sign-in and email-link sign-in. For a new email account, confirm the email link, open **My account** while signed in, and set a password there. If the email link opens a different browser, it signs in that browser only; on the iPhone Home Screen app, copy the confirmation or Sign in link and paste it into that app's sign-in form before opening it elsewhere. Existing accounts can set a password from **My account** and use it on other devices. Only this project's verification links are accepted. A one-time code is also supported if your custom email template supplies one. Supabase Free currently requires custom SMTP for editing email templates. Supabase's built-in email sender currently only sends to organization team addresses and is limited to roughly two emails per hour. Test with your project owner's email. Public sign-ins require custom SMTP; use a free SMTP allowance you already have that requires no payment method, or use the included GitHub OAuth option described below. Do not enable paid email delivery to proceed. [Supabase SMTP restrictions](https://supabase.com/docs/guides/auth/auth-smtp).
+8. Enable Email auth. The player signs into an existing account using email and password only; there is no verification-code step at normal sign-in. A newly created email account may require one initial email confirmation in Supabase before password sign-in works. The project owner's account has already completed that setup. Passwords are changed by the signed-in account in **My account**. [Supabase email/password auth](https://supabase.com/docs/guides/auth/passwords).
 9. After signing in, add a file again to save it in your account. Browser-local files are not silently uploaded. Your private audio metadata and file are then readable only by your account through the app. Application moderators can review clips but cannot browse or stream other accounts' music.
-
-### Optional GitHub sign-in without SMTP
-
-The sign-in dialog can also offer **Continue with GitHub**. It is hidden until configured. Set the public build variable `VITE_GITHUB_AUTH_ENABLED=true` only after completing the provider setup, then redeploy. To configure it, create a GitHub OAuth App in your GitHub account's **Settings → Developer settings → OAuth Apps**. Set the homepage to your website URL and the authorization callback URL to `https://YOUR_PROJECT_REF.supabase.co/auth/v1/callback`. In Supabase **Authentication → Sign In / Providers → GitHub**, enable GitHub and enter that OAuth App's Client ID and Client Secret. Keep the secret in Supabase's provider settings only. Retain your site URLs in the auth redirect allowlist. This uses GitHub's account sign-in and does not send magic-link emails or require a paid SMTP service. An unconfigured provider returns an auth error; local mode remains available.
 
 ### Moderation queue
 
@@ -105,7 +102,7 @@ Signed-in uploaders must provide a title, category, source URL, permission detai
 
 ### Limits and safe failure
 
-The **aggregate ceiling is 850,000,000 bytes (850 MB)** across private music, approved clips, pending clips and incomplete upload reservations. It is enforced in a serialized PostgreSQL function before accepting a file, not just in frontend JavaScript. Each file is limited to 40 MB. The provider's separate 1 GB file-storage allowance leaves headroom. Use a dedicated project; unrelated files in another bucket are outside this ledger.
+The **aggregate ceiling is 850,000,000 bytes (850 MB)** across private music, approved clips, pending clips and incomplete upload reservations. It is enforced in a serialized PostgreSQL function before accepting a file, not just in frontend JavaScript. Each logical file is limited to 100 MB. Files above 40 MB are stored as ordered private objects of at most 40 MB each, under Supabase Free's per-object limit. The provider's separate 1 GB file-storage allowance leaves headroom. Use a dedicated project; unrelated files in another bucket are outside this ledger.
 
 `public.app_limits` is administrator-only. Change limits downward, or pause uploads/streams, using SQL Editor:
 
@@ -120,7 +117,7 @@ where id = true;
 
 The database prevents raising these values above 850 MB storage / 4 GB media transfer budget. No automatic deletions or paid upgrades exist. If the library is full, existing files remain and uploads pause. Explicit user deletion removes the object through the Storage API before releasing its reservation. Do not delete `storage.objects` rows directly.
 
-Media requests reserve **three times the entire file size plus 16 KB** before downloading. This conservative budget allows for Storage-to-Edge-to-browser transfer and overhead. The app downloads one requested music file or clip into a temporary Blob, so local seeking does not create repeated range requests. A new request is charged again. Only the active and fading scene are kept; object URLs are revoked. A 40 MB file can take time to buffer on a slow connection. Upload progress measures network transfer and then shows a finishing stage.
+Media requests reserve **three times the entire file size plus 16 KB** before downloading. This conservative budget allows for transfer overhead. Private music stored as one object (up to 40 MB) now receives an owner-checked, one-hour signed Storage URL so the browser can start playback and seek without waiting for the whole file. Larger logical files use up to three 40 MB private objects; the gateway fetches them in order and returns one Blob, so these still buffer before playback. A new play request is charged again. Only the active and fading scene are kept; object URLs are revoked. A 100 MB file can take time to buffer on a slow connection and use substantial phone memory. Upload progress measures network transfer and then shows a finishing stage.
 
 The media ledger resets automatically in a new UTC calendar month. Failed transfers keep bandwidth reservations. It is a **media safety budget**, not a real-time meter for every Supabase byte: database queries, Auth, errors, logs, unrelated project traffic, and Edge invocations also consume provider quotas. The app cannot guarantee public, unbounded traffic fits a free service. Check **Supabase → Usage** regularly and pause the project or gateway if other quotas are near their limit. Provider-side Free plan restrictions remain the final boundary. Never move the organization to a paid plan or add a payment method to address traffic.
 
@@ -165,7 +162,7 @@ Do not place MP3, MP4, WebM, WAV, FLAC or M4A files in the Git repository or Pag
 
 When a song is selected, its highlighted artwork pulses briefly while audio prepares. There is no separate “Tuning in” loading label.
 
-- To add more stock footage, verify the **individual** item and license for your creative player, retain its source/creator/license, compress under 40 MB, submit it through a signed-in clip upload, and approve it as moderator. Never approve a clip simply because it is watchable online. Review restrictions on standalone redistribution; don't add a download button for licensed stock originals.
+- To add more stock footage, verify the **individual** item and license for your creative player, retain its source/creator/license, compress under 100 MB, submit it through a signed-in clip upload, and approve it as moderator. Never approve a clip simply because it is watchable online. Review restrictions on standalone redistribution; don't add a download button for licensed stock originals.
 - Real anime/film trailers are linked to the official GKIDS distributor page in a separate area. Opening it pauses music. No trailer is downloaded, muted, cropped, looped or used as a background.
 - If a future Pixabay integration needs an API key, implement it in a server-only Edge Function secret. Never introduce `VITE_PIXABAY_KEY` or commit a key. Manual verified uploads already work without an API.
 
@@ -182,4 +179,4 @@ The player uses local Arial/Helvetica/system fonts. Icons are Lucide. No analyti
 
 ## Verification and practical limits
 
-Local browser testing covers desktop and phone layouts, center/outer wheel actions, audio start/pause, metadata import, favorites and file persistence. The production build and SQL/access tests run locally. Live Supabase integration is not claimed to be verified without your project. Browser quota eviction, disabled site storage, unsupported codecs, provider downtime and slow connections can interrupt playback. Keep originals of local uploads: IndexedDB is not a backup. There is no cross-device synchronization until Supabase is configured, no automatic rights verification, and no promise that unrestricted public traffic fits free hosting.
+Local browser testing covers desktop and phone layouts, center/outer wheel actions, audio start/pause, metadata import, favorites and file persistence. The production build and SQL/access tests run locally. In the connected project, password sign-in and playback of an existing private Deftones upload have been verified. A real 100 MB upload has not been run against the live project. Browser quota eviction, disabled site storage, unsupported codecs, provider downtime and slow connections can interrupt playback. Keep originals of local uploads: IndexedDB is not a backup. There is no automatic rights verification or promise that unrestricted public traffic fits free hosting.

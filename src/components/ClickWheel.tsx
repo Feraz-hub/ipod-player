@@ -7,6 +7,8 @@ export default function ClickWheel({
   onMenu,
   onPrevious,
   onNext,
+  onSeekBack,
+  onSeekForward,
   onPlay,
   playing,
   volumeMode = false,
@@ -16,6 +18,8 @@ export default function ClickWheel({
   onMenu: () => void;
   onPrevious: () => void;
   onNext: () => void;
+  onSeekBack: () => void;
+  onSeekForward: () => void;
   onPlay: () => void;
   playing: boolean;
   volumeMode?: boolean;
@@ -26,6 +30,29 @@ export default function ClickWheel({
     dragged: boolean;
   } | null>(null);
   const suppress = useRef(false);
+  const skipHold = useRef<{ timer: ReturnType<typeof setTimeout>; fired: boolean } | null>(null);
+  const skipClick = useRef(false);
+  const startSkipHold = (seek: () => void) => {
+    clearSkipHold();
+    skipHold.current = {
+      fired: false,
+      timer: setTimeout(() => {
+        if (skipHold.current) {
+          skipHold.current.fired = true;
+          skipClick.current = true;
+          seek();
+        }
+      }, 500),
+    };
+  };
+  const clearSkipHold = () => {
+    if (skipHold.current) clearTimeout(skipHold.current.timer);
+    skipHold.current = null;
+  };
+  const handleSkipClick = (action: () => void) => {
+    if (skipClick.current) skipClick.current = false;
+    else action();
+  };
   const [active, setActive] = useState(false);
   const [angle, setAngle] = useState(0);
   const getAngle = (e: React.PointerEvent) => {
@@ -79,6 +106,7 @@ export default function ClickWheel({
           setAngle((v) => v + delta);
           if (Math.abs(g.total) > 16) {
             g.dragged = true;
+            clearSkipHold();
             suppress.current = true;
             onRotate(Math.sign(g.total));
             g.total = 0;
@@ -116,12 +144,22 @@ export default function ClickWheel({
         </button>
         <button
           className="wheel-previous"
-          onClick={onPrevious}
-          aria-label="Previous track"
+          onPointerDown={() => startSkipHold(onSeekBack)}
+          onPointerUp={clearSkipHold}
+          onPointerCancel={() => { clearSkipHold(); skipClick.current = false; }}
+          onContextMenu={(e) => e.preventDefault()}
+          onClick={() => handleSkipClick(onPrevious)}
+          aria-label="Previous track; hold to rewind 10 seconds"
         >
           <SkipBack size={21} fill="currentColor" />
         </button>
-        <button className="wheel-next" onClick={onNext} aria-label="Next track">
+        <button className="wheel-next"
+          onPointerDown={() => startSkipHold(onSeekForward)}
+          onPointerUp={clearSkipHold}
+          onPointerCancel={() => { clearSkipHold(); skipClick.current = false; }}
+          onContextMenu={(e) => e.preventDefault()}
+          onClick={() => handleSkipClick(onNext)}
+          aria-label="Next track; hold to forward 10 seconds">
           <SkipForward size={21} fill="currentColor" />
         </button>
         <button

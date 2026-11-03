@@ -1,4 +1,5 @@
-export const MAX_FILE = 40_000_000;
+export const MAX_FILE = 100_000_000;
+export const CLOUD_CHUNK = 40_000_000;
 export const STORAGE_CAP = 850_000_000;
 export const AUDIO_TYPES = [
   "audio/mpeg",
@@ -17,7 +18,7 @@ export function validateFile(file, kind) {
   if (!file.size) throw new Error("This file is empty. Choose another file.");
   if (file.size > MAX_FILE)
     throw new Error(
-      "Choose a file smaller than 40 MB. Compress your clip or track first.",
+      "Choose a file no larger than 100 MB. Compress your clip or track first.",
     );
   if (!(kind === "music" ? AUDIO_TYPES : VIDEO_TYPES).includes(file.type))
     throw new Error(

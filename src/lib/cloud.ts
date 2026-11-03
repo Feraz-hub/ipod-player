@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Media, Usage } from "../types";
+import { CLOUD_CHUNK } from "./rules.mjs";
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
 export const cloud =
@@ -50,11 +51,15 @@ export async function uploadCloud(
     size: file.size,
     mime: file.type,
   });
-  await new Promise<void>((resolve, reject) => {
+  const parts = Math.ceil(file.size / CLOUD_CHUNK);
+  for (let part = 0; part < parts; part++) {
+    const offset = part * CLOUD_CHUNK;
+    const slice = file.slice(offset, offset + CLOUD_CHUNK, file.type);
+    await new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open(
       "PUT",
-      `${url}/functions/v1/media-gateway/upload/${reservation.id}`,
+      `${url}/functions/v1/media-gateway/upload/${reservation.id}${parts > 1 ? `/${part}` : ""}`,
     );
     xhr.setRequestHeader("Authorization", `Bearer ${token}`);
     xhr.setRequestHeader("apikey", key);
@@ -67,7 +72,8 @@ export async function uploadCloud(
         ),
       );
     xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) progress(Math.round((e.loaded / e.total) * 95));
+      if (e.lengthComputable)
+        progress(Math.round(((offset + e.loaded) / file.size) * 95));
     };
     xhr.onerror = () =>
       reject(
@@ -77,7 +83,6 @@ export async function uploadCloud(
       );
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
-        progress(100);
         resolve();
       } else {
         let message = "Upload failed.";
@@ -87,6 +92,9 @@ export async function uploadCloud(
         reject(new Error(message));
       }
     };
-    xhr.send(file);
-  });
+    xhr.send(slice);
+    });
+  }
+  await api("complete", { id: reservation.id });
+  progress(100);
 }

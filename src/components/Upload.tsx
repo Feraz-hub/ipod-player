@@ -250,7 +250,7 @@ export default function Upload({
             {kind === "music"
               ? "MP3, M4A, AAC, OGG, WAV, FLAC, WebM"
               : "MP4, WebM, compatible MOV"}{" "}
-            · up to 40 MB
+            · up to 100 MB
           </span>
           <input
             aria-label={

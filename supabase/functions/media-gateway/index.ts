@@ -12,6 +12,7 @@ const allowed = (
   .map((s) => s.trim());
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const CHUNK_SIZE = 40_000_000;
 const check = (result: any) => {
   if (result.error) throw new Error(result.error.message);
   return result.data;
@@ -119,6 +120,24 @@ Deno.serve(async (req: Request) => {
     const bucket = (m: any) =>
       m.kind === "music" ? "private-music" : "community-clips";
     const path = (m: any) => `${m.owner_id}/${m.id}`;
+    const partCount = (m: any) => Math.ceil(m.size / CHUNK_SIZE);
+    const partPath = (m: any, index: number) =>
+      partCount(m) === 1 ? path(m) : `${path(m)}.part${index}`;
+    const partSize = (m: any, index: number) =>
+      Math.min(CHUNK_SIZE, m.size - index * CHUNK_SIZE);
+    const finishUpload = async (row: any) => {
+      for (let index = 0; index < partCount(row); index++) {
+        const { data, error } = await admin.storage
+          .from(bucket(row)).info(partPath(row, index));
+        if (error || data?.size !== partSize(row, index))
+          return false;
+      }
+      check(await admin.from("media").update({
+        status: row.kind === "music" ? "private" : "pending",
+        updated_at: new Date().toISOString(),
+      }).eq("id", row.id).eq("status", "uploading"));
+      return true;
+    };
     if (action === "usage" && req.method === "GET")
       return json(check(await admin.rpc("media_usage")));
     if (action === "me" && req.method === "GET") {
@@ -144,31 +163,37 @@ Deno.serve(async (req: Request) => {
     if (action === "upload" && req.method === "PUT") {
       requireUser();
       const row = await getMedia(id);
-      if (row.owner_id !== user.id || row.status !== "reserved")
+      if (row.owner_id !== user.id || !["reserved", "uploading"].includes(row.status))
         throw new Error("This upload reservation is unavailable.");
-      // Atomic claim prevents concurrent overwrites of a reservation.
-      const claimed = check(
-        await admin
-          .from("media")
-          .update({ status: "uploading" })
-          .eq("id", id)
-          .eq("status", "reserved")
-          .select("id"),
-      );
-      if (!claimed?.length)
-        throw new Error("This upload is already in progress.");
-      const bytes = await readBounded(req, row.size);
+      const count = partCount(row);
+      const part = count === 1 && parts[gateway + 3] === undefined
+        ? 0
+        : Number(parts[gateway + 3]);
+      if (!Number.isInteger(part) || part < 0 || part >= count ||
+          (count > 1 && parts[gateway + 3] !== String(part)) ||
+          (count === 1 && parts[gateway + 3] !== undefined))
+        throw new Error("Invalid upload part.");
+      if (row.status === "reserved") {
+        // Claim once. Later chunks reuse this reservation, but every object
+        // remains private until all expected parts exist at the right size.
+        const claimed = check(
+          await admin.from("media").update({ status: "uploading" })
+            .eq("id", id).eq("status", "reserved").select("id"),
+        );
+        if (!claimed?.length)
+          throw new Error("This upload is already in progress.");
+      }
+      const bytes = await readBounded(req, partSize(row, part));
       if (
-        bytes.byteLength !== row.size ||
+        bytes.byteLength !== partSize(row, part) ||
         req.headers.get("Content-Type") !== row.mime
       ) {
-        await admin.from("media").update({ status: "reserved" }).eq("id", id);
         throw new Error("File size or format does not match its reservation.");
       }
       // MIME is allowlisted by SQL; the browser also checks codec playability.
       const { error } = await admin.storage
         .from(bucket(row))
-        .upload(path(row), bytes, {
+        .upload(partPath(row, part), bytes, {
           contentType: row.mime,
           upsert: false,
           cacheControl: "0",
@@ -177,16 +202,31 @@ Deno.serve(async (req: Request) => {
         throw new Error(
           "Storage upload failed. Reservation retained; delete it from My account before retrying.",
         );
-      check(
-        await admin
-          .from("media")
-          .update({
-            status: row.kind === "music" ? "private" : "pending",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", id),
-      );
+      return json({ ok: true, complete: await finishUpload(row) });
+    }
+    if (action === "complete" && req.method === "POST") {
+      requireUser();
+      const input = await body();
+      const row = await getMedia(input.id);
+      if (row.owner_id !== user.id) throw new Error("This upload is private.");
+      if (["private", "pending"].includes(row.status)) return json({ ok: true });
+      if (row.status !== "uploading" || !(await finishUpload(row)))
+        throw new Error("Upload is incomplete. Retry the missing part.");
       return json({ ok: true });
+    }
+    if (action === "stream-url" && req.method === "POST") {
+      requireUser();
+      const input = await body();
+      const row = await getMedia(input.id);
+      if (row.kind !== "music" || row.owner_id !== user.id ||
+          row.status !== "private")
+        throw new Error("This music is private or not ready.");
+      if (partCount(row) !== 1)
+        throw new Error("This track uses multipart playback.");
+      check(await admin.rpc("reserve_stream", { p_bytes: row.size }));
+      const signed = check(await admin.storage.from(bucket(row))
+        .createSignedUrl(partPath(row, 0), 3600));
+      return json({ url: signed.signedUrl });
     }
     if (action === "stream" && req.method === "GET") {
       const row = await getMedia(id);
@@ -200,20 +240,21 @@ Deno.serve(async (req: Request) => {
       if (["reserved", "uploading", "deleting"].includes(row.status))
         throw new Error("This upload is not ready.");
       check(await admin.rpc("reserve_stream", { p_bytes: row.size }));
-      // Full-object fetching enables local seeking without range-request egress surprises.
-      // No signed storage URL or service credential ever reaches the browser.
-      const { data, error } = await admin.storage
-        .from(bucket(row))
-        .download(path(row));
-      if (error || !data)
-        throw new Error(
-          "This file is unavailable. Its bandwidth reservation is retained conservatively.",
-        );
-      return new Response(data, {
+      // Blob composition keeps part bytes in order without copying them into
+      // another large Uint8Array. No storage URL or key reaches the browser.
+      const blobs: Blob[] = [];
+      for (let part = 0; part < partCount(row); part++) {
+        const { data, error } = await admin.storage
+          .from(bucket(row)).download(partPath(row, part));
+        if (error || !data || data.size !== partSize(row, part))
+          throw new Error("A stored upload part is unavailable.");
+        blobs.push(data);
+      }
+      return new Response(new Blob(blobs, { type: row.mime }), {
         headers: {
           ...cors,
           "Content-Type": row.mime,
-          "Content-Length": String(data.size),
+          "Content-Length": String(row.size),
         },
       });
     }
@@ -237,7 +278,9 @@ Deno.serve(async (req: Request) => {
       );
       if (!claimed?.length)
         throw new Error("The upload changed. Refresh and try deleting again.");
-      check(await admin.storage.from(bucket(row)).remove([path(row)]));
+      check(await admin.storage.from(bucket(row)).remove(
+        Array.from({ length: partCount(row) }, (_, index) => partPath(row, index)),
+      ));
       check(
         await admin
           .from("media")

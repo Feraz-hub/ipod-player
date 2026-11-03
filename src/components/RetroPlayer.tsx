@@ -239,7 +239,7 @@ export function RetroLibrary(p: LibraryProps) {
                       }
                     }}
                   >
-                    <Cover src={m.cover} index={m.scene ?? i} />
+                    <Cover src={m.cover} index={m.scene ?? i} seed={m.id} />
                     <span className="retro-song-label">
                       <strong>{m.title}</strong>
                       <small>{m.artist}</small>
@@ -480,6 +480,8 @@ export function RetroWheel({
   onBack,
   onPrevious,
   onNext,
+  onSeekBack,
+  onSeekForward,
   onPlay,
   onClose,
 }: {
@@ -492,6 +494,8 @@ export function RetroWheel({
   onBack: () => void;
   onPrevious: () => void;
   onNext: () => void;
+  onSeekBack?: () => void;
+  onSeekForward?: () => void;
   onPlay: () => void;
   onClose: () => void;
 }) {
@@ -511,6 +515,8 @@ export function RetroWheel({
         onMenu={onBack}
         onPrevious={onPrevious}
         onNext={onNext}
+        onSeekBack={onSeekBack || (() => {})}
+        onSeekForward={onSeekForward || (() => {})}
         onPlay={onPlay}
       />
       <span className="retro-wheel-caption">
