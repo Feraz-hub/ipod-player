@@ -129,8 +129,6 @@ export default function App() {
     [menuOpen, setMenuOpen] = useState(false),
     [chromeVisible, setChromeVisible] = useState(true);
   const audio = useRef<HTMLAudioElement | null>(null),
-    ctx = useRef<AudioContext | null>(null),
-    gain = useRef<GainNode | null>(null),
     audioUrl = useRef(""),
     playTicket = useRef(0),
     keyHandler = useRef<(event: KeyboardEvent) => void>(() => {}),
@@ -154,8 +152,6 @@ export default function App() {
   const stopPlayback = useCallback(() => {
     playTicket.current++;
     audio.current?.pause();
-    const context = ctx.current;
-    if (context?.state === "running") void context.suspend().catch(() => {});
     setPlaying(false);
     setLoading(false);
   }, []);
@@ -262,6 +258,7 @@ export default function App() {
     const a = new Audio();
     a.preload = "auto";
     a.loop = false;
+    a.volume = volume;
     audio.current = a;
     const update = () => {
       setPosition(a.currentTime);
@@ -287,16 +284,11 @@ export default function App() {
       a.removeAttribute("src");
       a.load();
       if (audioUrl.current) URL.revokeObjectURL(audioUrl.current);
-      void ctx.current?.close();
-      ctx.current = null;
-      gain.current = null;
       audio.current = null;
     };
   }, [notify]);
   useEffect(() => {
-    if (gain.current && ctx.current)
-      gain.current.gain.setTargetAtTime(volume, ctx.current.currentTime, 0.04);
-    else if (audio.current) audio.current.volume = volume;
+    if (audio.current) audio.current.volume = volume;
   }, [volume]);
   useEffect(() => {
     const persist = () => {
@@ -396,37 +388,11 @@ export default function App() {
     return () => clearTimeout(t);
   }, [cinema, playing, chosenClip, readyClipId, activeClip.id]);
 
-  const prepare = () => {
-    if (!audio.current) return;
-    if (!ctx.current) {
-      const AC =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext })
-          .webkitAudioContext;
-      if (AC) {
-        audio.current.volume = 1;
-        ctx.current = new AC();
-        gain.current = ctx.current.createGain();
-        gain.current.gain.value = volume;
-        ctx.current
-          .createMediaElementSource(audio.current)
-          .connect(gain.current);
-        gain.current.connect(ctx.current.destination);
-      } else {
-        audio.current.volume = volume;
-      }
-    }
-    if (ctx.current?.state === "suspended")
-      void ctx.current
-        .resume()
-        .catch(() => notify("Tap Play again to allow audio."));
-  };
   async function start(track?: Media) {
     if (!track) {
       notify("Add music or select a demo track first.");
       return;
     }
-    prepare();
     const ticket = ++playTicket.current;
     setLoading(true);
     try {

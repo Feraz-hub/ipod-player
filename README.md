@@ -41,7 +41,7 @@ The wheel is always visible outside the display. Circular dragging, scrolling ov
 
 | Input                                   | Browse                          | Playback                     |
 | --------------------------------------- | ------------------------------- | ---------------------------- |
-| Drag around wheel / mouse wheel over it | Move selection                  | Change music gain            |
+| Drag around wheel / mouse wheel over it | Move selection                  | Change music volume          |
 | Center                                  | Play selected track             | Play / pause                 |
 | Top / MENU                              | Return to library               | Return to library            |
 | Left / right wheel buttons              | Previous / next selection       | Previous / next track        |
@@ -54,7 +54,7 @@ The wheel is always visible outside the display. Circular dragging, scrolling ov
 | + / −                                   | Music volume                    | Music volume                 |
 | Escape                                  | Return                          | Return to library            |
 
-Touch gestures use the same circular motion. Player gain uses Web Audio `MediaElementAudioSourceNode → GainNode → destination`, with smooth gain ramps. The phone's system volume is not changed. The video element is always muted. Motion is reduced when the operating system requests it. Browser full-screen is optional and may be unavailable in embedded or mobile browsers.
+Touch gestures use the same circular motion. Player volume uses the audio element's native volume control so private music streamed from Supabase remains audible across origins. The phone's system volume is not changed. The video element is always muted. Motion is reduced when the operating system requests it. Browser full-screen is optional and may be unavailable in embedded or mobile browsers.
 
 The highlighted song smoothly grows larger than neighboring rows, including its artwork, title and artist. Songs without embedded artwork receive one of 20 locally hosted dark stills from the licensed scene collection; each song keeps the same fallback image across visits. Sources are recorded in `public/covers/SOURCES.json`. Short synthesized beeps mark wheel steps and menu selections. Sounds unlock after the first pointer/key interaction and can be disabled with **Settings → Wheel sounds**; this preference is saved in the browser. No external sound files or audio service are needed.
 
@@ -170,7 +170,7 @@ The player uses local Arial/Helvetica/system fonts. Icons are Lucide. No analyti
 
 ## Live acceptance checks after setup
 
-1. Sign in as account A. Upload music, edit its title and artist, favorite it, play, seek, rotate both directions to change gain, pause, skip and return with MENU. Reload and verify library/settings persistence. Playback never resumes without a gesture.
+1. Sign in as account A. Upload music, edit its title and artist, favorite it, play, seek, rotate both directions to change volume, pause, skip and return with MENU. Reload and verify library/settings persistence. Playback never resumes without a gesture.
 2. Sign in as account B in a separate browser. A's tracks, covers, state and files must be unavailable. Also test with the moderator role: it must not reveal A's music.
 3. Submit a permitted clip as A. B must not see or stream it until approved. Approve from the moderator queue, watch as B while music plays, and check the video is muted. Confirm there is just one stored object.
 4. Report with three distinct accounts; verify hiding. Test owner deletion and unauthorized deletion. Check moderation report reasons in the clip details.
