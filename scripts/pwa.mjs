@@ -52,9 +52,9 @@ export default function appShell() {
         "favicon.svg",
         "night-alley.jpg",
         "city-night.jpg",
-        "icons/icon-192.png",
-        "icons/icon-512.png",
-        "icons/apple-touch-icon.png",
+        "icons/nightshift-192.png",
+        "icons/nightshift-512.png",
+        "icons/nightshift-apple.png",
       );
       this.emitFile({
         type: "asset",

@@ -82,6 +82,15 @@ test("service worker ignores cloud/private media, authorization, queries and wri
 });
 
 test("Home Screen launch and icons stay inside any GitHub Pages project path", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  for (const href of [
+    "./favicon.svg?v=2",
+    "./icons/nightshift-apple.png",
+    "./manifest.webmanifest",
+  ]) {
+    assert.ok(html.includes(`href="${href}"`));
+    assert.ok(new URL(href, "https://feraz-hub.github.io/ipod-player/").pathname.startsWith("/ipod-player/"));
+  }
   const manifest = JSON.parse(
     await readFile(new URL("../public/manifest.webmanifest", import.meta.url)),
   );
@@ -94,7 +103,7 @@ test("Home Screen launch and icons stay inside any GitHub Pages project path", a
   assert.equal(manifest.display, "standalone");
   for (const icon of [
     ...manifest.icons,
-    { src: "icons/apple-touch-icon.png" },
+    { src: "icons/nightshift-apple.png" },
   ]) {
     const data = await readFile(
       new URL("../public/" + icon.src, import.meta.url),
