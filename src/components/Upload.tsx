@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   UploadCloud,
   FileAudio,
@@ -14,6 +14,8 @@ import type { Media } from "../types";
 export default function Upload({
   kind,
   account,
+  cloudStorageRemaining,
+  cloudBandwidthRemaining,
   onClose,
   onDone,
   onSignIn,
@@ -21,6 +23,8 @@ export default function Upload({
 }: {
   kind: "music" | "clip";
   account: boolean;
+  cloudStorageRemaining: number;
+  cloudBandwidthRemaining: number;
   onClose: () => void;
   onDone: (destination: "cloud" | "device") => void;
   onSignIn: () => void;
@@ -39,8 +43,21 @@ export default function Upload({
     [reading, setReading] = useState(false),
     [progress, setProgress] = useState(0),
     [error, setError] = useState("");
-  const [deviceConsent, setDeviceConsent] = useState(false);
   const accountStorage = account && !!cloud;
+  const [destination, setDestination] = useState<"cloud" | "device">(
+    accountStorage ? "cloud" : "device",
+  );
+  const cloudLimitReason = file
+    ? file.size > cloudStorageRemaining
+      ? "Cloud storage is full for this file. Save it on this device instead."
+      : file.size * 3 + 16_384 > cloudBandwidthRemaining
+        ? "The monthly cloud bandwidth budget is too low for this file. Save it on this device instead."
+        : null
+    : null;
+  useEffect(() => {
+    if (destination === "cloud" && (!accountStorage || cloudLimitReason))
+      setDestination("device");
+  }, [accountStorage, cloudLimitReason, destination]);
   async function choose(f?: File) {
     if (!f) return;
     setReading(true);
@@ -84,6 +101,12 @@ export default function Upload({
         URL.revokeObjectURL(objectUrl);
       }
       setFile(f);
+      if (
+        accountStorage &&
+        (f.size > cloudStorageRemaining ||
+          f.size * 3 + 16_384 > cloudBandwidthRemaining)
+      )
+        setDestination("device");
       setTitle(f.name.replace(/\.[^.]+$/, ""));
       setArtist("Unknown artist");
       setCover(undefined);
@@ -126,7 +149,8 @@ export default function Upload({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!file) return;
-    if (!accountStorage && !deviceConsent) return;
+    if (destination === "cloud" && (!accountStorage || cloudLimitReason))
+      return;
     setBusy(true);
     setError("");
     try {
@@ -146,7 +170,7 @@ export default function Upload({
         throw new Error(
           "Add a source, permission details and confirm your sharing rights.",
         );
-      if (accountStorage) {
+      if (destination === "cloud") {
         await uploadCloud(file, metadata, setProgress);
       } else {
         await navigator.storage?.persist?.().catch(() => false);
@@ -178,7 +202,7 @@ export default function Upload({
         } as Media);
         setProgress(100);
       }
-      onDone(accountStorage ? "cloud" : "device");
+      onDone(destination);
       onClose();
     } catch (e) {
       setError((e as Error).message);
@@ -199,28 +223,59 @@ export default function Upload({
       }}
     >
       <p className="muted">
-        {accountStorage
+        {destination === "cloud"
           ? kind === "music"
-            ? "Saved privately to your account. Closing the app or clearing this device’s browser data will not delete your account uploads. Wait for the saved confirmation."
+            ? "Saved privately to your account and available on your other signed-in devices."
             : "Clips enter a moderation queue before everyone can watch them."
-          : kind === "music"
-            ? "Saved only in this browser. Sign in to keep music in your private cloud library."
-            : "Local preview only. Sign in with a connected project to submit to the community."}
+          : "Saved in this browser on this device only. It will not appear on your other devices, and clearing browser data may remove it."}
       </p>
+      <fieldset className="storage-choice">
+        <legend>Save {kind === "music" ? "music" : "clip"} to</legend>
+        <label
+          className={`storage-option ${destination === "device" ? "selected" : ""}`}
+        >
+          <input
+            type="radio"
+            name="upload-destination"
+            checked={destination === "device"}
+            onChange={() => setDestination("device")}
+            disabled={busy}
+          />
+          <span>
+            <strong>This device</strong>
+            <small>
+              Works without cloud bandwidth · stays on this phone or computer
+            </small>
+          </span>
+        </label>
+        {accountStorage && (
+          <label
+            className={`storage-option ${destination === "cloud" ? "selected" : ""}`}
+          >
+            <input
+              type="radio"
+              name="upload-destination"
+              checked={destination === "cloud"}
+              onChange={() => setDestination("cloud")}
+              disabled={busy || !!cloudLimitReason}
+            />
+            <span>
+              <strong>My account</strong>
+              <small>Private cloud library · available on all signed-in devices</small>
+            </span>
+          </label>
+        )}
+        {accountStorage && cloudLimitReason && (
+          <p className="storage-limit" role="status">
+            {cloudLimitReason}
+          </p>
+        )}
+      </fieldset>
       {!accountStorage && (
-        <div className="storage-choice">
+        <div className="storage-signin">
           <button type="button" className="primary full" onClick={onSignIn}>
             <UploadCloud size={17} /> Sign in to save to your account
           </button>
-          <label className="checkbox">
-            <input
-              type="checkbox"
-              checked={deviceConsent}
-              onChange={(e) => setDeviceConsent(e.target.checked)}
-            />
-            Import on this device instead. This is not a cloud backup; clearing
-            site data or iPhone storage cleanup can remove it.
-          </label>
         </div>
       )}
       <form onSubmit={submit}>
@@ -350,7 +405,7 @@ export default function Upload({
             <progress value={progress} max="100" />
             <span>
               {progress < 95
-                ? `Uploading ${progress}%`
+                ? `${destination === "cloud" ? "Uploading" : "Saving"} ${progress}%`
                 : "Finishing and saving…"}
             </span>
           </div>
@@ -358,7 +413,11 @@ export default function Upload({
         <button
           className="primary full"
           disabled={
-            !file || reading || busy || (!accountStorage && !deviceConsent)
+            !file ||
+            reading ||
+            busy ||
+            (destination === "cloud" &&
+              (!accountStorage || !!cloudLimitReason))
           }
           type="submit"
         >
@@ -371,7 +430,7 @@ export default function Upload({
           )}{" "}
           {busy
             ? "Saving…"
-            : accountStorage
+            : destination === "cloud"
               ? kind === "music"
                 ? "Upload to my account"
                 : "Submit for review"

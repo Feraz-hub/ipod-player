@@ -108,7 +108,6 @@ type LibraryProps = {
   repeat: boolean;
   toggleShuffle: () => void;
   toggleRepeat: () => void;
-  capacity: boolean;
   onSettings: () => void;
   onTrailers: () => void;
   onHelp: () => void;
@@ -322,7 +321,6 @@ export function RetroLibrary(p: LibraryProps) {
               key={i}
               onClick={() => p.onMenuChoose(i)}
               onPointerEnter={() => p.onMenuHighlight(i)}
-              disabled={label === "Add music" && p.capacity}
             >
               {label}
             </button>

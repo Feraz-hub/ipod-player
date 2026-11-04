@@ -29,9 +29,9 @@ After an online visit, the production service worker caches the interface, metad
 
 ### Keeping your music
 
-**Sign in and choose “Upload to my account.”** Wait for the saved confirmation before closing the app. The file is stored in a private Supabase bucket, independent of this phone’s browser storage. Signing back in retrieves the account library even after local site data is cleared. GitHub holds the app source, never your uploaded music.
+**Sign in and choose “My account” in the upload form** to sync a song to your other devices. Wait for the saved confirmation before closing the app. The file is stored in a private Supabase bucket, independent of this phone’s browser storage. Signing back in retrieves the account library even after local site data is cleared. GitHub holds the app source, never your uploaded music.
 
-Unsigned users must explicitly choose a **device-only import**. It is stored in IndexedDB and requests persistent browser storage when available, but iPhone cleanup, clearing site data, removing the app or browser storage eviction can remove it. The app never silently substitutes a device import for a failed cloud upload. Safari and the Home Screen app may have separate local storage; sign in and upload from the Home Screen app for your account library.
+Anyone, including a signed-in user, can choose **This device** in the upload form. This path works when cloud bandwidth or storage is exhausted. It is stored in IndexedDB and requests persistent browser storage when available, but iPhone cleanup, clearing site data, removing the app or browser storage eviction can remove it. The app never silently substitutes a device import for a failed cloud upload; it selects the device option before saving when the chosen file exceeds the remaining cloud budget. Safari and the Home Screen app may have separate local storage; choose My account for cross-device access.
 
 Keep original music files or an independent backup. No free hosted service can guarantee retention “no matter what”: Supabase Free may pause inactive projects and has limited recovery windows; a database backup does not include Storage file contents. The app has no automatic file expiry or deletion when a quota is reached. [Free project pausing](https://supabase.com/docs/guides/platform/free-project-pausing), [database versus Storage backups](https://supabase.com/docs/guides/platform/backups).
 
@@ -115,7 +115,7 @@ set storage_cap = 800000000,
 where id = true;
 ```
 
-The database prevents raising these values above 850 MB storage / 4 GB media transfer budget. No automatic deletions or paid upgrades exist. If the library is full, existing files remain and uploads pause. Explicit user deletion removes the object through the Storage API before releasing its reservation. Do not delete `storage.objects` rows directly.
+The database prevents raising these values above 850 MB storage / 4 GB media transfer budget. No automatic deletions or paid upgrades exist. If the cloud library is full, existing files remain and cloud uploads pause; device imports remain available. Explicit user deletion removes the object through the Storage API before releasing its reservation. Do not delete `storage.objects` rows directly.
 
 Media requests reserve **three times the entire file size plus 16 KB** before downloading. This conservative budget allows for transfer overhead. Private music stored as one object (up to 40 MB) now receives an owner-checked, one-hour signed Storage URL so the browser can start playback and seek without waiting for the whole file. Larger logical files use up to three 40 MB private objects; the gateway fetches them in order and returns one Blob, so these still buffer before playback. A new play request is charged again. Only the active and fading scene are kept; object URLs are revoked. A 100 MB file can take time to buffer on a slow connection and use substantial phone memory. Upload progress measures network transfer and then shows a finishing stage.
 

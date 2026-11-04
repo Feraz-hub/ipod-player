@@ -626,12 +626,6 @@ export default function App() {
     { label: "Controls / help", action: () => setModal("help") },
   ];
   function chooseMenu(index: number) {
-    if (index === 3 && capacity) {
-      notify(
-        "Uploads are paused because the storage or bandwidth limit has been reached.",
-      );
-      return;
-    }
     wheelSound.beep("select");
     deviceMenu[index]?.action();
     setMenuOpen(false);
@@ -777,7 +771,6 @@ export default function App() {
               repeat={repeat}
               toggleShuffle={() => setShuffle((v) => !v)}
               toggleRepeat={() => setRepeat((v) => !v)}
-              capacity={capacity}
               onSettings={() => setModal("settings")}
               onTrailers={() => chooseView("trailers")}
               onHelp={() => setModal("help")}
@@ -813,7 +806,6 @@ export default function App() {
                     <button
                       className="outline"
                       onClick={() => setUpload("clip")}
-                      disabled={capacity}
                     >
                       <Plus size={16} /> Submit a clip
                     </button>
@@ -1020,9 +1012,11 @@ export default function App() {
         )}
         {capacity && !cinema && (
           <div className="retro-capacity" role="alert">
-            {storage.used >= storage.cap
-              ? "Library full. Uploads are paused. Existing files are kept."
-              : "Monthly bandwidth cap reached. Local music remains available."}
+            {!cloud
+              ? "Device library is full. Free browser storage to add more music."
+              : storage.used >= storage.cap
+              ? "Cloud storage is full. You can still save music on this device."
+              : "Monthly cloud bandwidth reached. You can still save music on this device."}
           </div>
         )}
         <RetroDock
@@ -1063,6 +1057,8 @@ export default function App() {
           <UploadDialog
             kind={upload}
             account={!!user}
+            cloudStorageRemaining={Math.max(0, storage.cap - storage.used)}
+            cloudBandwidthRemaining={Math.max(0, storage.egressCap - storage.egress)}
             onClose={() => setUpload(null)}
             onSignIn={() => {
               setUpload(null);
@@ -1142,7 +1138,7 @@ export default function App() {
             <StorageMeter storage={storage} local={!cloud} />
             <p className="small muted">
               {cloud
-                ? "Uploads pause at the shared storage or media bandwidth cap."
+                ? "Cloud uploads pause at the shared storage or media bandwidth cap. Saving on this device remains available."
                 : "This session saves files on this browser. Clearing site data removes them. Keep a copy of your originals."}
             </p>
           </Dialog>
@@ -1385,7 +1381,9 @@ function StorageMeter({ storage, local }: { storage: Usage; local: boolean }) {
       <progress value={storage.used} max={storage.cap} />
       {storage.used >= storage.cap ? (
         <p className="form-error">
-          Library full. Uploads are paused. Existing files are kept.
+          {local
+            ? "Device library full. Free browser storage to add more music."
+            : "Cloud library full. Cloud uploads are paused. Existing files are kept."}
         </p>
       ) : (
         <p>
@@ -1396,8 +1394,8 @@ function StorageMeter({ storage, local }: { storage: Usage; local: boolean }) {
       )}
       {storage.egress >= storage.egressCap && (
         <p className="form-error">
-          Monthly media bandwidth reached. Streaming and uploads resume next
-          month.
+          Monthly media bandwidth reached. Cloud streaming and uploads resume
+          next month. You can still save music on this device.
         </p>
       )}
     </div>

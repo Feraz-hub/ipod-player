@@ -1164,7 +1164,7 @@ h1 + p,
   color: #adafc1;
   gap: 9px;
 }
-.dialog input:not([type="range"]):not([type="checkbox"]):not([type="file"]):not([type="color"]),
+.dialog input:not([type="range"]):not([type="checkbox"]):not([type="file"]):not([type="color"]):not([type="radio"]),
 .dialog textarea,
 .dialog select {
   color: #dcdbe7;
@@ -2930,7 +2930,18 @@ kbd {
 .home-screen-help ol { padding-left: 23px; line-height: 1.8; font-size: 13px; }
 .home-screen-help li { margin: 7px 0; }
 .home-screen-help li svg { vertical-align: -2px; }
-.storage-choice { padding: 14px; border: 1px solid #ffffff24; border-radius: 9px; margin-bottom: 20px; }
+.storage-choice { padding: 14px; border: 1px solid #ffffff24; border-radius: 9px; margin: 0 0 14px; }
+.storage-choice legend { padding: 0 6px; font-size: 12px; color: #d8d6e5; }
+.dialog .storage-option { display: flex; flex-direction: row; align-items: flex-start; gap: 12px; padding: 12px; border: 1px solid #ffffff1c; border-radius: 8px; cursor: pointer; }
+.storage-option + .storage-option { margin-top: 8px; }
+.storage-option.selected { border-color: #c0b9df85; background: #c0b9df14; }
+.storage-option:has(input:disabled) { opacity: .55; cursor: not-allowed; }
+.storage-option input { margin-top: 3px; flex: none; accent-color: #beb7d7; }
+.storage-option span { display: flex; flex-direction: column; gap: 3px; }
+.storage-option strong { font-size: 13px; color: #f1eff7; }
+.storage-option small { font-size: 11px; line-height: 1.5; color: #aaa6b7; }
+.storage-limit { margin: 10px 0 0; color: #e8bbc1; font-size: 11px; line-height: 1.5; }
+.storage-signin { margin-bottom: 16px; }
 .track-row:focus-within .track-more {
   opacity: 1;
 }
