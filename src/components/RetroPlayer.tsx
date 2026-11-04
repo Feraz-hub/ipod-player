@@ -242,6 +242,7 @@ export function RetroLibrary(p: LibraryProps) {
                     <span className="retro-song-label">
                       <strong>{m.title}</strong>
                       <small>{m.artist}</small>
+                      {!m.demo && <small className="retro-storage-label">{m.local ? "This device" : "My account · cloud"}</small>}
                     </span>
                   </button>
                   <button

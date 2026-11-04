@@ -46,6 +46,7 @@ import {
 } from "./lib/local";
 import { clamp, CLOUD_CHUNK, STORAGE_CAP } from "./lib/rules.mjs";
 import { createDemoAudio } from "./lib/audio";
+import { pauseMusic, applyMusicVolume, resumeMusicOutput } from "./lib/playback.mjs";
 import useWheelSound from "./lib/useWheelSound";
 import ClickWheel from "./components/ClickWheel";
 import IPodDevice from "./components/IPodDevice";
@@ -153,7 +154,7 @@ export default function App() {
     refreshTicket = useRef(0);
   const stopPlayback = useCallback(() => {
     playTicket.current++;
-    audio.current?.pause();
+    pauseMusic(audio.current, audioGain.current);
     setPlaying(false);
     setLoading(false);
   }, []);
@@ -276,8 +277,18 @@ export default function App() {
     a.addEventListener("timeupdate", update);
     a.addEventListener("loadedmetadata", update);
     a.addEventListener("ended", ended);
-    a.addEventListener("pause", () => setPlaying(false));
-    a.addEventListener("play", () => setPlaying(true));
+    a.addEventListener("pause", () => {
+      if (audioGain.current) audioGain.current.gain.value = 0;
+      a.muted = true;
+      setPlaying(false);
+    });
+    a.addEventListener("playing", () => {
+      if (a.paused) return;
+      setPlaying(true);
+      a.muted = false;
+      if (audioGain.current)
+        audioGain.current.gain.value = latest.current.volume;
+    });
     a.addEventListener("error", () => {
       setLoading(false);
       notify(
@@ -296,8 +307,7 @@ export default function App() {
     };
   }, [notify]);
   useEffect(() => {
-    if (audioGain.current) audioGain.current.gain.value = volume;
-    else if (audio.current) audio.current.volume = volume;
+    applyMusicVolume(audio.current, audioGain.current, volume);
   }, [volume]);
   useEffect(() => {
     const persist = () => {
@@ -406,12 +416,20 @@ export default function App() {
     setLoading(true);
     try {
       const a = audio.current!;
+      // Tell iOS this is music playback, including when Web Audio supplies
+      // the wheel's volume control.
+      const session = (navigator as Navigator & {
+        audioSession?: { type: string };
+      }).audioSession;
+      if (session) {
+        try { session.type = "playback"; } catch { /* Optional browser API. */ }
+      }
       if (!audioContext.current && typeof AudioContext !== "undefined") {
         let context: AudioContext | null = null;
         try {
           context = new AudioContext();
           const gain = context.createGain();
-          gain.gain.value = volume;
+          gain.gain.value = 0;
           context
             .createMediaElementSource(a)
             .connect(gain)
@@ -419,16 +437,25 @@ export default function App() {
           a.volume = 1;
           audioContext.current = context;
           audioGain.current = gain;
+          context.onstatechange = () => {
+            if (context && context.state !== "running" && !a.paused) {
+              gain.gain.value = 0;
+              a.pause();
+              notify("Your phone interrupted audio. Tap Play to resume.");
+            }
+          };
         } catch {
           void context?.close();
           a.volume = volume;
         }
       }
       // Resume during the Play gesture, before any network request yields.
-      if (audioContext.current?.state === "suspended")
-        void audioContext.current.resume().catch(() => {});
+      const context = audioContext.current;
+      const resumed = resumeMusicOutput(context);
       if (current?.id !== track.id || !a.src) {
         a.pause();
+        if (track.local && !track.blob)
+          throw new Error("This device's copy is unavailable. Import the original song on this device again.");
         const source = track.demo
           ? await createDemoAudio(track.scene || 0)
           : track.blob || (track.size <= CLOUD_CHUNK && track.kind === "music"
@@ -448,8 +475,14 @@ export default function App() {
           restore.current = null;
         }
       }
+      a.muted = false;
       await a.play();
+      if (!(await resumed) || (context && context.state !== "running")) {
+        a.pause();
+        throw new Error("Your phone has paused audio output. Tap Play again to resume sound.");
+      }
       if (ticket !== playTicket.current) return;
+      if (audioGain.current) audioGain.current.gain.value = latest.current.volume;
       if (!cinema || current?.id !== track.id) {
         setClipSession((s) => s + 1);
         setClipIndex(0);
@@ -462,7 +495,9 @@ export default function App() {
       notify(
         e instanceof DOMException && e.name === "NotAllowedError"
           ? "Your browser needs another tap. Press Play to allow audio."
-          : errorText(e),
+          : errorText(e).includes("Monthly media bandwidth reached")
+            ? "This is an account song and needs cloud bandwidth to play. Import its original file with Add music → This device to play locally."
+            : errorText(e),
       );
     } finally {
       if (ticket === playTicket.current) setLoading(false);
@@ -1196,6 +1231,11 @@ export default function App() {
             </p>
             {detail.kind === "music" ? (
               <>
+                {!detail.demo && <p className="small muted">
+                  {detail.local
+                    ? "This device · plays from browser storage without cloud bandwidth."
+                    : "My account · streams from the cloud and uses monthly media bandwidth. Import the original file on this device for local playback."}
+                </p>}
                 <button
                   className="action-row"
                   onClick={() => {
