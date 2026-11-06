@@ -390,18 +390,24 @@ export default function App() {
     const localClips = media.filter(
       (m) => m.kind === "clip" && m.local && m.blob,
     );
-    if (localClips.length) return localClips;
-    const pool = [
+    const onlineClips = [
       ...starters.filter(
         (clip) => clip.externalUrl || clip.id === "scene-deep-dream",
       ),
-      ...media.filter((m) => m.kind === "clip" && m.status === "approved"),
+      ...media.filter((m) => m.kind === "clip" && !m.local && m.status === "approved"),
     ];
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [pool[i], pool[j]] = [pool[j], pool[i]];
+    for (const pool of [localClips, onlineClips]) {
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+      }
     }
-    return pool;
+    const mixed: Media[] = [];
+    for (let i = 0; i < Math.max(localClips.length, onlineClips.length); i++) {
+      if (localClips[i]) mixed.push(localClips[i]);
+      if (onlineClips[i]) mixed.push(onlineClips[i]);
+    }
+    return mixed;
   }, [media, clipSession]);
   const communityClips = [...starters, ...cloudClips];
   const activeClip =
@@ -410,7 +416,7 @@ export default function App() {
     if (!cinema || chosenClip || clips.length < 2 || readyClipId !== activeClip.id)
       return;
     const seconds = activeClip.local && activeClip.duration > 0
-      ? activeClip.duration
+      ? Math.min(activeClip.duration, 12)
       : 4;
     const timer = setTimeout(() => setClipIndex((i) => i + 1), seconds * 1000);
     return () => clearTimeout(timer);
@@ -1166,7 +1172,7 @@ export default function App() {
             }}
             onDone={(destination) => {
               if (upload === "clip" && destination === "device") {
-                setMood("This device");
+                setMood("All moods");
                 setModView(false);
                 setChosenClip(null);
                 setClipIndex(0);
