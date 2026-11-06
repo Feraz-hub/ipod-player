@@ -296,8 +296,7 @@ export default function App() {
       if (a.paused) return;
       setPlaying(true);
       a.muted = false;
-      if (audioGain.current)
-        audioGain.current.gain.value = latest.current.volume;
+      applyMusicVolume(a, audioGain.current, latest.current.volume);
     });
     a.addEventListener("error", () => {
       setLoading(false);
@@ -434,10 +433,13 @@ export default function App() {
       if (session) {
         try { session.type = "playback"; } catch { /* Optional browser API. */ }
       }
-      if (!audioContext.current && typeof AudioContext !== "undefined") {
+      const MusicContext = window.AudioContext ?? (
+        window as Window & { webkitAudioContext?: typeof AudioContext }
+      ).webkitAudioContext;
+      if (!audioContext.current && MusicContext) {
         let context: AudioContext | null = null;
         try {
-          context = new AudioContext();
+          context = new MusicContext();
           const gain = context.createGain();
           gain.gain.value = 0;
           context
@@ -485,14 +487,14 @@ export default function App() {
           restore.current = null;
         }
       }
-      a.muted = false;
+      a.muted = !audioGain.current && latest.current.volume === 0;
       await a.play();
       if (!(await resumed) || (context && context.state !== "running")) {
         a.pause();
         throw new Error("Your phone has paused audio output. Tap Play again to resume sound.");
       }
       if (ticket !== playTicket.current) return;
-      if (audioGain.current) audioGain.current.gain.value = latest.current.volume;
+      applyMusicVolume(a, audioGain.current, latest.current.volume);
       setPreviewId(null);
       if (!cinema || current?.id !== track.id) {
         setClipSession((s) => s + 1);

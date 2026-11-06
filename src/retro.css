@@ -842,6 +842,11 @@
 .retro-player .dialog input[type="range"] {
   accent-color: #a3b693;
 }
+.retro-player .dialog input[aria-label="Music volume"] {
+  height: 44px;
+  margin: 0;
+  touch-action: pan-y;
+}
 .retro-player .muted {
   color: #9aa592;
 }

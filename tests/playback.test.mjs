@@ -22,3 +22,15 @@ test("an interrupted phone output is resumed, and a stuck resume is bounded", as
   assert.equal(await resumeMusicOutput(context), true);
   assert.equal(await resumeMusicOutput({ state: "suspended", resume: () => new Promise(() => {}) }, 10), false);
 });
+
+test("native playback mutes at zero and stays muted while paused", () => {
+  const audio = { paused: false, muted: false, volume: 1 };
+  applyMusicVolume(audio, null, 0);
+  assert.equal(audio.muted, true);
+  applyMusicVolume(audio, null, 0.25);
+  assert.equal(audio.volume, 0.25);
+  assert.equal(audio.muted, false);
+  audio.paused = true;
+  applyMusicVolume(audio, null, 0.5);
+  assert.equal(audio.muted, true);
+});

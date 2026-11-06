@@ -8,8 +8,13 @@ export function pauseMusic(audio, gain) {
 }
 
 export function applyMusicVolume(audio, gain, volume) {
-  if (gain) gain.gain.value = !audio || audio.paused ? 0 : volume;
-  else if (audio) audio.volume = volume;
+  if (!audio) return;
+  if (gain) {
+    gain.gain.value = audio.paused ? 0 : volume;
+  } else {
+    audio.volume = volume;
+    audio.muted = audio.paused || volume === 0;
+  }
 }
 
 export async function resumeMusicOutput(context, timeoutMs = 5000) {
