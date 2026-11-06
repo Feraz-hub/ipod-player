@@ -1380,9 +1380,10 @@
 .cover-preview-art { position: relative; width: 140px; flex: none; margin-right: 70px; }
 .cover-preview-art > .cover {
   position: relative;
+  z-index: 1;
   display: block;
   width: 100%;
-  aspect-ratio: 1;
+  height: 140px;
   object-fit: cover;
   border-radius: 6px;
 }
