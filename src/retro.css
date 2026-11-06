@@ -1338,23 +1338,26 @@
     opacity: 0.5;
   }
 }
-/* Cover Stack shares the library and player with Classic. */
-.cover-stack .retro-song-window {
-  inset: 10% 8% 12%;
+/* The front cover falls past the bottom of the stack as the next one steps forward. */
+.ipod-screen .cover-stack .retro-song-window {
+  inset: 7% 4% 8%;
   width: auto;
   mask-image: none;
 }
-.cover-stack .retro-song-reel { inset: 33% 0 auto; }
+.cover-stack .retro-song-reel { inset: 36% 0 auto; }
 .cover-stack .retro-song {
   position: absolute;
-  inset: 0 auto auto 10%;
-  width: 78%;
-  transition: transform .36s ease, opacity .25s ease;
+  inset: 0 auto auto 4%;
+  width: 88%;
+  filter: none;
+  transform-origin: 82px 0;
+  transition: transform .28s cubic-bezier(.22,.75,.24,1);
 }
-.cover-stack .retro-song-select { padding: 0; gap: 22px; }
-.cover-stack .retro-song-select .cover {
-  width: 145px;
-  height: 145px;
+.ipod-screen .cover-stack .retro-song-select { padding: 0; gap: 24px; }
+.ipod-screen .cover-stack .retro-song-select .cover,
+.stack-departing > .cover {
+  width: 164px;
+  height: 164px;
   object-fit: cover;
   border-radius: 6px;
 }
@@ -1362,64 +1365,116 @@
 .cover-stack .retro-song:not(.selected) .retro-track-options,
 .cover-stack .retro-graphic { visibility: hidden; }
 .cover-stack .retro-song.selected .retro-track-options { opacity: 1; }
+.stack-departing {
+  position: absolute;
+  left: 4%;
+  top: 0;
+  z-index: 6;
+  pointer-events: none;
+  animation: stack-drop .28s cubic-bezier(.42,0,.85,1) both;
+}
+@keyframes stack-drop {
+  0% { transform: translateY(0); opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translateY(145px); opacity: 0; }
+}
 
-.cover-preview, .disc-loading {
+/* One disc stays mounted as it leaves the sleeve and becomes the loader. */
+.album-stage {
   position: absolute;
   inset: 0;
   z-index: 65;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  isolation: isolate;
+  overflow: hidden;
   color: #e4eee6;
 }
-.cover-preview {
-  gap: 36px;
-  padding: 24px 36px;
-  background: linear-gradient(90deg, #07100bbd, #07100be8);
-}
-.cover-preview-art { position: relative; width: 140px; flex: none; margin-right: 70px; }
-.cover-preview-art > .cover {
-  position: relative;
-  z-index: 1;
-  display: block;
-  width: 100%;
-  height: 140px;
-  object-fit: cover;
-  border-radius: 6px;
-}
-.cover-preview-disc {
+.album-stage::before {
+  content: "";
   position: absolute;
   inset: 0;
-  animation: cover-disc-slide .55s ease-out both;
+  z-index: -1;
+  background: #020403d9;
+  transition: background .35s ease;
 }
-@keyframes cover-disc-slide {
-  from { transform: translateX(0); opacity: .4; }
-  to { transform: translateX(52%); opacity: 1; }
+.album-loading::before { background: #000; }
+.album-stage-cover,
+.album-stage-disc {
+  position: absolute;
+  width: 28%;
+  aspect-ratio: 1;
+  top: 61%;
+  left: 19%;
+  transform: translate(-50%, -50%);
 }
-.cover-preview-info { min-width: 0; display: grid; gap: 8px; }
-.cover-preview-info strong { overflow-wrap: anywhere; font-size: 18px; }
-.cover-preview-info span { font-size: 13px; opacity: .76; }
-.cover-preview-actions { display: flex; gap: 8px; }
-.cover-preview-actions button, .disc-loading button {
-  border: 1px solid #a8c4ae60;
-  border-radius: 4px;
-  padding: 7px 12px;
+.album-stage-cover { transition: opacity .24s ease, transform .35s ease; }
+.album-stage-cover > .cover {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 5px;
+}
+.album-stage-disc {
+  left: 31%;
+  perspective: 680px;
+  transition: left .48s ease, top .48s ease, width .48s ease;
+  animation: album-disc-out .58s cubic-bezier(.2,.75,.2,1) both;
+}
+@keyframes album-disc-out {
+  from { translate: -43% 0; }
+  to { translate: 0 0; }
+}
+.album-loading .album-stage-disc {
+  left: 84%;
+  top: 79%;
+  width: 14%;
+  animation: none;
+}
+.album-loading .album-stage-cover {
+  opacity: 0;
+  transform: translate(-50%, -27%);
+}
+.album-stage-turn {
+  width: 100%;
+  height: 100%;
+  animation: album-disc-turn 1.55s ease-in-out infinite;
+}
+.album-stage-metal {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, #020403 0 7%, #dce2d6 7.5% 11%, #393b32 11.5% 14%, #e0e4d5 14.5% 17%, transparent 17.5%),
+    conic-gradient(#506552, #fff9cc 58deg, #8bbca2 83deg, #ece9bf 116deg, #435d50 162deg, #dae5b2 207deg, #ffebc2 243deg, #96b6b4 282deg, #e4f3c3 320deg, #506552);
+  box-shadow: inset 0 0 0 1px #fff7, 0 4px 12px #0006;
+  animation: retro-spin 2.8s linear infinite;
+}
+@keyframes album-disc-turn {
+  0%, 100% { transform: rotateY(-12deg); }
+  50% { transform: rotateY(72deg); }
+}
+.album-stage-info { position: absolute; top: 52%; left: 55%; right: 6%; display: grid; gap: 7px; }
+.album-stage-info strong { overflow-wrap: anywhere; font-size: 18px; }
+.album-stage-info > span { font-size: 13px; opacity: .76; }
+.album-stage-actions { display: flex; gap: 16px; }
+.album-stage-actions button {
   color: inherit;
-  background: #24352b;
+  padding: 6px 4px;
+  font: 600 16px Georgia, serif;
+  text-transform: uppercase;
 }
-.disc-loading {
-  background: #050706;
-  flex-direction: column;
-  gap: 9px;
-  font-size: 13px;
-  animation: disc-loading-in .12s linear .12s both;
+.album-stage-actions button:hover, .album-stage-actions button:focus-visible { text-decoration: underline; }
+.album-loading-label {
+  position: absolute;
+  left: 8%;
+  top: 86%;
+  font: 600 12px Georgia, serif;
 }
-.disc-loading-art { width: 54px; height: 54px; }
-.disc-loading button { font-size: 11px; }
-@keyframes disc-loading-in { from { opacity: 0; } to { opacity: 1; } }
 .retro-player.is-cinema .playback-visuals { animation: disc-loading-in .3s ease-out; }
+@keyframes disc-loading-in { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
-  .cover-stack .retro-song { transition: none; }
-  .cover-preview-disc { animation: none; transform: translateX(52%); }
-  .disc-loading, .retro-player.is-cinema .playback-visuals { animation: none; }
+  .cover-stack .retro-song, .album-stage::before, .album-stage-cover, .album-stage-disc { transition: none; }
+  .stack-departing { visibility: hidden; }
+  .stack-departing, .album-stage-disc, .album-stage-turn, .album-stage-metal,
+  .retro-player.is-cinema .playback-visuals { animation-duration: 1ms; animation-iteration-count: 1; }
 }

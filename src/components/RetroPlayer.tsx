@@ -1,4 +1,4 @@
-import { useId, useEffect, useRef, useState } from "react";
+import { useId, useLayoutEffect, useEffect, useRef, useState } from "react";
 import {
   BatteryFull,
   Home,
@@ -122,6 +122,15 @@ export function RetroLibrary(p: LibraryProps) {
   const [height, setHeight] = useState(382);
   const rowHeight = 140;
   const index = Math.min(p.selected, Math.max(0, p.tracks.length - 1));
+  const front = p.coverTheme ? p.tracks[index] : undefined;
+  const lastFront = useRef<Media | undefined>(undefined);
+  const [departing, setDeparting] = useState<Media>();
+  useLayoutEffect(() => {
+    const previous = lastFront.current;
+    lastFront.current = front;
+    if (front && previous && front.id !== previous.id) setDeparting(previous);
+    else if (!front) setDeparting(undefined);
+  }, [front]);
   useEffect(() => {
     const update = () => {
       if (list.current) {
@@ -209,8 +218,9 @@ export function RetroLibrary(p: LibraryProps) {
             }}
           >
             {p.tracks.map((m, i) => {
-              const offset = i - index;
-              const distance = Math.abs(offset);
+              const distance = p.coverTheme
+                ? (i - index + p.tracks.length) % p.tracks.length
+                : Math.abs(i - index);
               if (p.coverTheme && distance > 3) return null;
               return (
                 <div
@@ -219,10 +229,10 @@ export function RetroLibrary(p: LibraryProps) {
                   style={{
                     height: p.coverTheme ? undefined : rowHeight,
                     transform: p.coverTheme
-                      ? `translate(${offset * 8}px, ${-distance * 21}px) scale(${1 - distance * 0.09})`
+                      ? `translateY(${-distance * 27}px) scale(${1 - distance * 0.10})`
                       : undefined,
                     zIndex: p.coverTheme ? 4 - distance : undefined,
-                    opacity: p.coverTheme ? 1 - distance * 0.17 :
+                    opacity: p.coverTheme ? 1 :
                       distance > 2
                         ? 0.08
                         : distance === 2
@@ -263,6 +273,12 @@ export function RetroLibrary(p: LibraryProps) {
                 </div>
               );
             })}
+            {p.coverTheme && departing && (
+              <div className="stack-departing" key={departing.id} aria-hidden="true"
+                onAnimationEnd={() => setDeparting(undefined)}>
+                <Cover src={departing.cover} seed={departing.id} index={departing.scene} />
+              </div>
+            )}
           </div>
         ) : (
           <div className="retro-empty">
@@ -290,7 +306,7 @@ export function RetroLibrary(p: LibraryProps) {
         </button>
       </div>
       <span className="retro-key-hint">
-        {p.coverTheme ? "scroll to browse · center to select" : "scroll to browse · center / enter to play"}
+        scroll to browse · center / enter to select
       </span>
       {p.searchOpen && (
         <div className="retro-search-box">

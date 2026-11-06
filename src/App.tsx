@@ -58,7 +58,6 @@ import HomeScreen from "./components/HomeScreen";
 import Visuals from "./components/Visuals";
 import {
   AlleyBackground,
-  HoloDisc,
   RetroLibrary,
   RetroStatus,
   RetroDock,
@@ -518,7 +517,8 @@ export default function App() {
   function togglePlay() {
     if (playing || loading) {
       stopPlayback();
-    } else void start(cinema ? current || highlighted : highlighted);
+    } else if (cinema) void start(current || highlighted);
+    else openTrack(previewTrack || highlighted);
   }
   function next(direction = 1) {
     if (!tracks.length) return;
@@ -541,7 +541,7 @@ export default function App() {
     return () => window.removeEventListener("nightshift-ended", ended);
   }, []);
   function rotate(delta: number) {
-    if (loading || (!cinema && coverTheme && previewId && !menuOpen)) return;
+    if (loading || (!cinema && previewTrack && !menuOpen)) return;
     if (cinema || (menuOpen && view === "library") || tracks.length > 1)
       wheelSound.beep();
     if (menuOpen && !cinema && view === "library") {
@@ -681,12 +681,12 @@ export default function App() {
     deviceMenu[index]?.action();
     setMenuOpen(false);
   }
-  const previewTrack = coverTheme && !cinema && view === "library"
+  const previewTrack = !cinema && view === "library"
     ? tracks.find((track) => track.id === previewId)
     : undefined;
   function openTrack(track?: Media) {
     if (loading) return;
-    if (coverTheme && track && previewId !== track.id) {
+    if (view === "library" && track && previewId !== track.id) {
       setPreviewId(track.id);
       return;
     }
@@ -1074,27 +1074,29 @@ export default function App() {
             onCredits={() => setDetail(activeClip)}
           />
         )}
-        {previewTrack && (
-          <div className="cover-preview" role="group" aria-label="Selected track">
-            <div className="cover-preview-art">
-              <div className="cover-preview-disc"><HoloDisc /></div>
-              <Cover src={previewTrack.cover} seed={previewTrack.id} index={previewTrack.scene} />
+        {(previewTrack || loading) && (
+          <div className={`album-stage ${loading ? "album-loading" : ""}`}
+            role="group" aria-label={loading ? "Loading track" : "Selected track"}>
+            <div className="album-stage-disc" aria-hidden="true">
+              <div className="album-stage-turn"><div className="album-stage-metal" /></div>
             </div>
-            <div className="cover-preview-info">
-              <strong>{previewTrack.title}</strong>
-              <span>{previewTrack.artist}</span>
-              <div className="cover-preview-actions">
-                <button disabled={loading} onClick={() => void start(previewTrack)}>Play</button>
-                <button onClick={back}>Back</button>
+            {previewTrack && (
+              <div className="album-stage-cover" aria-hidden={loading}>
+                <Cover src={previewTrack.cover} seed={previewTrack.id} index={previewTrack.scene} />
               </div>
-            </div>
-          </div>
-        )}
-        {loading && (
-          <div className="disc-loading" role="status">
-            <div className="disc-loading-art"><HoloDisc /></div>
-            <span>Loading…</span>
-            <button onClick={stopPlayback}>Back</button>
+            )}
+            {loading ? (
+              <span className="album-loading-label" role="status">Loading…</span>
+            ) : previewTrack && (
+              <div className="album-stage-info">
+                <strong>{previewTrack.title}</strong>
+                <span>{previewTrack.artist}</span>
+                <div className="album-stage-actions">
+                  <button onClick={() => void start(previewTrack)}>Play</button>
+                  <button onClick={back}>Back</button>
+                </div>
+              </div>
+            )}
           </div>
         )}
         {capacity && !cinema && (
