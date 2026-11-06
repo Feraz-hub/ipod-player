@@ -13,6 +13,7 @@ local-media/
 *.webm
 *.mp3
 *.wav
+!src/lib/reference-scroll.wav
 *.m4a
 *.flac
 *.aac

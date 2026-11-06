@@ -1338,3 +1338,87 @@
     opacity: 0.5;
   }
 }
+/* Cover Stack shares the library and player with Classic. */
+.cover-stack .retro-song-window {
+  inset: 10% 8% 12%;
+  width: auto;
+  mask-image: none;
+}
+.cover-stack .retro-song-reel { inset: 33% 0 auto; }
+.cover-stack .retro-song {
+  position: absolute;
+  inset: 0 auto auto 10%;
+  width: 78%;
+  transition: transform .36s ease, opacity .25s ease;
+}
+.cover-stack .retro-song-select { padding: 0; gap: 22px; }
+.cover-stack .retro-song-select .cover {
+  width: 145px;
+  height: 145px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+.cover-stack .retro-song:not(.selected) .retro-song-label,
+.cover-stack .retro-song:not(.selected) .retro-track-options,
+.cover-stack .retro-graphic { visibility: hidden; }
+.cover-stack .retro-song.selected .retro-track-options { opacity: 1; }
+
+.cover-preview, .disc-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 65;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #e4eee6;
+}
+.cover-preview {
+  gap: 36px;
+  padding: 24px 36px;
+  background: linear-gradient(90deg, #07100bbd, #07100be8);
+}
+.cover-preview-art { position: relative; width: 140px; flex: none; margin-right: 70px; }
+.cover-preview-art > .cover {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 6px;
+}
+.cover-preview-disc {
+  position: absolute;
+  inset: 0;
+  animation: cover-disc-slide .55s ease-out both;
+}
+@keyframes cover-disc-slide {
+  from { transform: translateX(0); opacity: .4; }
+  to { transform: translateX(52%); opacity: 1; }
+}
+.cover-preview-info { min-width: 0; display: grid; gap: 8px; }
+.cover-preview-info strong { overflow-wrap: anywhere; font-size: 18px; }
+.cover-preview-info span { font-size: 13px; opacity: .76; }
+.cover-preview-actions { display: flex; gap: 8px; }
+.cover-preview-actions button, .disc-loading button {
+  border: 1px solid #a8c4ae60;
+  border-radius: 4px;
+  padding: 7px 12px;
+  color: inherit;
+  background: #24352b;
+}
+.disc-loading {
+  background: #050706;
+  flex-direction: column;
+  gap: 9px;
+  font-size: 13px;
+  animation: disc-loading-in .12s linear .12s both;
+}
+.disc-loading-art { width: 54px; height: 54px; }
+.disc-loading button { font-size: 11px; }
+@keyframes disc-loading-in { from { opacity: 0; } to { opacity: 1; } }
+.retro-player.is-cinema .playback-visuals { animation: disc-loading-in .3s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .cover-stack .retro-song { transition: none; }
+  .cover-preview-disc { animation: none; transform: translateX(52%); }
+  .disc-loading, .retro-player.is-cinema .playback-visuals { animation: none; }
+}

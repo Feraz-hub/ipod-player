@@ -58,6 +58,7 @@ import HomeScreen from "./components/HomeScreen";
 import Visuals from "./components/Visuals";
 import {
   AlleyBackground,
+  HoloDisc,
   RetroLibrary,
   RetroStatus,
   RetroDock,
@@ -82,7 +83,17 @@ const validIpodColor = (value: unknown) =>
     : DEFAULT_IPOD_COLOR;
 
 export default function App() {
-  const wheelSound = useWheelSound();
+  const [coverTheme, setCoverTheme] = useState(false);
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const themeEdited = useRef(false);
+  const wheelSound = useWheelSound(coverTheme);
+  useEffect(() => {
+    let active = true;
+    void getSetting("cover-theme").then((value) => {
+      if (active && !themeEdited.current) setCoverTheme(value === true);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []);
   const [boot, setBoot] = useState(true),
     [loaded, setLoaded] = useState(false),
     [media, setMedia] = useState<Media[]>([]),
@@ -483,6 +494,7 @@ export default function App() {
       }
       if (ticket !== playTicket.current) return;
       if (audioGain.current) audioGain.current.gain.value = latest.current.volume;
+      setPreviewId(null);
       if (!cinema || current?.id !== track.id) {
         setClipSession((s) => s + 1);
         setClipIndex(0);
@@ -529,6 +541,7 @@ export default function App() {
     return () => window.removeEventListener("nightshift-ended", ended);
   }, []);
   function rotate(delta: number) {
+    if (loading || (!cinema && coverTheme && previewId && !menuOpen)) return;
     if (cinema || (menuOpen && view === "library") || tracks.length > 1)
       wheelSound.beep();
     if (menuOpen && !cinema && view === "library") {
@@ -543,7 +556,9 @@ export default function App() {
   }
   function back() {
     wheelSound.beep("back");
-    if (cinema) setCinema(false);
+    if (loading) stopPlayback();
+    else if (!cinema && previewId) setPreviewId(null);
+    else if (cinema) setCinema(false);
     else if (view !== "library") {
       setView("library");
       setSearch("");
@@ -629,6 +644,7 @@ export default function App() {
     }
   }
   const chooseView = (v: typeof view) => {
+    setPreviewId(null);
     setView(v);
     setCinema(false);
     setSearch("");
@@ -665,12 +681,24 @@ export default function App() {
     deviceMenu[index]?.action();
     setMenuOpen(false);
   }
+  const previewTrack = coverTheme && !cinema && view === "library"
+    ? tracks.find((track) => track.id === previewId)
+    : undefined;
+  function openTrack(track?: Media) {
+    if (loading) return;
+    if (coverTheme && track && previewId !== track.id) {
+      setPreviewId(track.id);
+      return;
+    }
+    void start(track);
+  }
   function selectHighlighted() {
     if (!menuOpen) wheelSound.beep("select");
     if (menuOpen && !cinema && view === "library") chooseMenu(menuIndex);
     else if (cinema) togglePlay();
     else if (view !== "library") chooseView("library");
-    else void start(highlighted);
+    else if (loading) stopPlayback();
+    else openTrack(previewTrack || highlighted);
   }
   const focusWheel = () =>
     document
@@ -771,7 +799,7 @@ export default function App() {
           accountEmail={user?.email}
           onAccount={() => setModal("auth")}
           onBack={() => {
-            if (cinema) back();
+            if (cinema || previewTrack || loading) back();
             else setMenuOpen((v) => !v);
           }}
         />
@@ -782,13 +810,14 @@ export default function App() {
               selected={selected}
               loaded={loaded}
               starting={loading}
+              coverTheme={coverTheme}
               search={search}
               setSearch={setSearch}
               setSelected={(index) => {
                 if (index !== selected) wheelSound.beep();
                 setSelected(index);
               }}
-              onPlay={(m) => void start(m)}
+              onPlay={openTrack}
               onOptions={setDetail}
               onUpload={() => setUpload("music")}
               onRotate={rotate}
@@ -1045,6 +1074,29 @@ export default function App() {
             onCredits={() => setDetail(activeClip)}
           />
         )}
+        {previewTrack && (
+          <div className="cover-preview" role="group" aria-label="Selected track">
+            <div className="cover-preview-art">
+              <div className="cover-preview-disc"><HoloDisc /></div>
+              <Cover src={previewTrack.cover} seed={previewTrack.id} index={previewTrack.scene} />
+            </div>
+            <div className="cover-preview-info">
+              <strong>{previewTrack.title}</strong>
+              <span>{previewTrack.artist}</span>
+              <div className="cover-preview-actions">
+                <button disabled={loading} onClick={() => void start(previewTrack)}>Play</button>
+                <button onClick={back}>Back</button>
+              </div>
+            </div>
+          </div>
+        )}
+        {loading && (
+          <div className="disc-loading" role="status">
+            <div className="disc-loading-art"><HoloDisc /></div>
+            <span>Loading…</span>
+            <button onClick={stopPlayback}>Back</button>
+          </div>
+        )}
         {capacity && !cinema && (
           <div className="retro-capacity" role="alert">
             {!cloud
@@ -1125,6 +1177,19 @@ export default function App() {
         {modal === "settings" && (
           <Dialog title="Make it your own." onClose={() => setModal(null)}>
             <HomeScreen />
+            <label>
+              Display theme
+              <select value={coverTheme ? "cover" : "classic"} onChange={(event) => {
+                const next = event.target.value === "cover";
+                themeEdited.current = true;
+                setPreviewId(null);
+                setCoverTheme(next);
+                void setSetting("cover-theme", next).catch(() => {});
+              }}>
+                <option value="classic">Classic</option>
+                <option value="cover">Cover Stack</option>
+              </select>
+            </label>
             <div className="ipod-color-setting">
               <label htmlFor="ipod-shell-color">iPod color</label>
               <div className="ipod-color-picker">

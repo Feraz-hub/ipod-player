@@ -1,13 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getSetting, setSetting } from "./local";
+import scrollSampleUrl from "./reference-scroll.wav?url&no-inline";
 
 type Beep = "scroll" | "select" | "back";
 
-export default function useWheelSound() {
+export default function useWheelSound(useSample = false) {
   const [enabled, setEnabled] = useState(true);
   const enabledNow = useRef(enabled);
   enabledNow.current = enabled;
   const context = useRef<AudioContext | null>(null);
+  const sampleBytes = useRef<ArrayBuffer | null>(null);
+  const sample = useRef<AudioBuffer | null>(null);
+  const decoding = useRef(false);
+  useEffect(() => {
+    if (!useSample || sampleBytes.current || sample.current) return;
+    const controller = new AbortController();
+    void fetch(scrollSampleUrl, { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error("Scroll sound unavailable");
+        return response.arrayBuffer();
+      })
+      .then((bytes) => { sampleBytes.current = bytes; })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [useSample]);
   const lastBeep = useRef(-Infinity);
   const request = useRef(0);
   const edited = useRef(false);
@@ -54,6 +70,13 @@ export default function useWheelSound() {
     (kind: Beep = "scroll") => {
       const ctx = unlock();
       if (!ctx) return;
+      if (useSample && sampleBytes.current && !sample.current && !decoding.current) {
+        decoding.current = true;
+        void ctx.decodeAudioData(sampleBytes.current.slice(0))
+          .then((buffer) => { sample.current = buffer; })
+          .catch(() => { sampleBytes.current = null; })
+          .finally(() => { decoding.current = false; });
+      }
       const ticket = ++request.current;
       const requestedAt = performance.now();
       const play = () => {
@@ -66,6 +89,14 @@ export default function useWheelSound() {
         )
           return;
         lastBeep.current = performance.now();
+        if (useSample && kind === "scroll" && sample.current) {
+          const source = ctx.createBufferSource();
+          source.buffer = sample.current;
+          source.connect(ctx.destination);
+          source.onended = () => source.disconnect();
+          source.start();
+          return;
+        }
         const duration = kind === "select" ? 0.055 : 0.032;
         const tone = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -93,7 +124,7 @@ export default function useWheelSound() {
           .then(play)
           .catch(() => {});
     },
-    [unlock],
+    [unlock, useSample],
   );
 
   const changeEnabled = (value: boolean) => {

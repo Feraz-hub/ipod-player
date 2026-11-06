@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useId, useEffect, useRef, useState } from "react";
 import {
   BatteryFull,
   Home,
@@ -37,6 +37,7 @@ export function AlleyBackground() {
 }
 
 export function HoloDisc() {
+  const gradient = useId();
   return (
     <div className="retro-disc-float" aria-hidden="true">
       <div className="retro-disc">
@@ -47,7 +48,7 @@ export function HoloDisc() {
         </div>
         <svg viewBox="0 0 240 240" className="retro-music-note">
           <defs>
-            <linearGradient id="note-metal" x1="0" y1="0" x2=".4" y2="1">
+            <linearGradient id={gradient} x1="0" y1="0" x2=".4" y2="1">
               <stop stopColor="#83e4ba" />
               <stop offset=".2" stopColor="#238e74" />
               <stop offset=".48" stopColor="#8fcdbe" />
@@ -65,7 +66,7 @@ export function HoloDisc() {
           />
           <path
             d="M94 146C75 141 61 153 67 165C73 179 99 175 104 158V91L163 77V132C140 127 125 139 132 152C139 166 165 159 174 144V53L94 73Z"
-            fill="url(#note-metal)"
+            fill={`url(#${gradient})`}
             stroke="#bdd8d2"
             strokeWidth="1.8"
           />
@@ -87,6 +88,7 @@ type LibraryProps = {
   selected: number;
   loaded: boolean;
   starting: boolean;
+  coverTheme: boolean;
   search: string;
   setSearch: (s: string) => void;
   setSelected: (n: number) => void;
@@ -153,7 +155,7 @@ export function RetroLibrary(p: LibraryProps) {
   }, [p.onRotate]);
   return (
     <main
-      className={`retro-library ${p.starting ? "is-starting" : ""}`}
+      className={`retro-library ${p.coverTheme ? "cover-stack" : ""} ${p.starting ? "is-starting" : ""}`}
       aria-label="Music library"
       aria-busy={p.starting}
     >
@@ -203,18 +205,24 @@ export function RetroLibrary(p: LibraryProps) {
           <div
             className="retro-song-reel"
             style={{
-              transform: `translateY(${height * 0.46 - rowHeight * (index + 0.5)}px)`,
+              transform: p.coverTheme ? undefined : `translateY(${height * 0.46 - rowHeight * (index + 0.5)}px)`,
             }}
           >
             {p.tracks.map((m, i) => {
-              const distance = Math.abs(i - index);
+              const offset = i - index;
+              const distance = Math.abs(offset);
+              if (p.coverTheme && distance > 3) return null;
               return (
                 <div
                   key={m.id}
                   className={`retro-song ${i === index ? "selected" : ""}`}
                   style={{
-                    height: rowHeight,
-                    opacity:
+                    height: p.coverTheme ? undefined : rowHeight,
+                    transform: p.coverTheme
+                      ? `translate(${offset * 8}px, ${-distance * 21}px) scale(${1 - distance * 0.09})`
+                      : undefined,
+                    zIndex: p.coverTheme ? 4 - distance : undefined,
+                    opacity: p.coverTheme ? 1 - distance * 0.17 :
                       distance > 2
                         ? 0.08
                         : distance === 2
@@ -282,7 +290,7 @@ export function RetroLibrary(p: LibraryProps) {
         </button>
       </div>
       <span className="retro-key-hint">
-        scroll to browse · center / enter to play
+        {p.coverTheme ? "scroll to browse · center to select" : "scroll to browse · center / enter to play"}
       </span>
       {p.searchOpen && (
         <div className="retro-search-box">
