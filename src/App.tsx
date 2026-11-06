@@ -388,34 +388,34 @@ export default function App() {
     (m) => m.kind === "clip" && (m.status === "approved" || m.local),
   );
   const clips = useMemo(() => {
+    const localClips = media.filter(
+      (m) => m.kind === "clip" && m.local && m.blob,
+    );
+    if (localClips.length) return localClips;
     const pool = [
       ...starters.filter(
         (clip) => clip.externalUrl || clip.id === "scene-deep-dream",
       ),
-      ...media.filter(
-        (m) => m.kind === "clip" && (m.status === "approved" || m.local),
-      ),
+      ...media.filter((m) => m.kind === "clip" && m.status === "approved"),
     ];
     for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [pool[i], pool[j]] = [pool[j], pool[i]];
     }
-    // Start on a compact source while longer scenes buffer later in the montage.
-    const fast = pool.findIndex((clip) =>
-      clip.externalUrl?.startsWith("https://assets.mixkit.co/"),
-    );
-    if (fast > 0) [pool[0], pool[fast]] = [pool[fast], pool[0]];
     return pool;
   }, [media, clipSession]);
   const communityClips = [...starters, ...cloudClips];
   const activeClip =
     chosenClip || clips[clipIndex % clips.length] || starters[0];
   useEffect(() => {
-    if (!cinema || !playing || chosenClip || readyClipId !== activeClip.id)
+    if (!cinema || chosenClip || clips.length < 2 || readyClipId !== activeClip.id)
       return;
-    const t = setTimeout(() => setClipIndex((i) => i + 1), 4000);
-    return () => clearTimeout(t);
-  }, [cinema, playing, chosenClip, readyClipId, activeClip.id]);
+    const seconds = activeClip.local && activeClip.duration > 0
+      ? activeClip.duration
+      : 4;
+    const timer = setTimeout(() => setClipIndex((i) => i + 1), seconds * 1000);
+    return () => clearTimeout(timer);
+  }, [cinema, chosenClip, clips.length, readyClipId, activeClip]);
 
   async function start(track?: Media) {
     if (!track) {
@@ -500,7 +500,7 @@ export default function App() {
       }
       setCinema(true);
       setView("library");
-      setChosenClip(null);
+      setChosenClip((clip) => clip?.local ? clip : null);
     } catch (e) {
       if (ticket !== playTicket.current) return;
       notify(
@@ -781,7 +781,6 @@ export default function App() {
         {cinema && (
           <Visuals
             clip={activeClip}
-            paused={!!current && !playing && !chosenClip}
             onError={notify}
             onReady={setReadyClipId}
           />
@@ -871,21 +870,29 @@ export default function App() {
                       className="outline"
                       onClick={() => setUpload("clip")}
                     >
-                      <Plus size={16} /> Submit a clip
+                      <Plus size={16} /> Add a clip
                     </button>
                   </div>
                   <div className="community-tools">
                     <div className="mood-filters">
-                      {categories.map((c) => (
+                      {[...categories, "This device"].map((c) => (
                         <button
                           className={mood === c ? "active" : ""}
-                          onClick={() => setMood(c)}
+                          onClick={() => {
+                            setMood(c);
+                            if (c === "This device") setModView(false);
+                          }}
                           key={c}
                         >
                           {c}
                         </button>
                       ))}
                     </div>
+                    {chosenClip && (
+                      <button className="outline" onClick={() => setChosenClip(null)}>
+                        Use automatic scenes
+                      </button>
+                    )}
                     {mod && (
                       <button
                         className="outline"
@@ -906,7 +913,7 @@ export default function App() {
                       : communityClips
                     )
                       .filter(
-                        (c) => mood === "All moods" || c.category === mood,
+                        (c) => mood === "This device" ? c.local : mood === "All moods" || c.category === mood,
                       )
                       .map((c, i) => (
                         <article className="clip-card" key={c.id}>
@@ -928,7 +935,9 @@ export default function App() {
                               <Scene scene={c.scene ?? i % 6} still />
                             )}
                             <span className="clip-badge">
-                              {c.externalUrl
+                              {c.local
+                                ? "THIS DEVICE"
+                                : c.externalUrl
                                 ? "LICENSED VIDEO"
                                 : c.demo
                                   ? "ORIGINAL SCENE"
@@ -1154,6 +1163,12 @@ export default function App() {
               setModal("auth");
             }}
             onDone={(destination) => {
+              if (upload === "clip" && destination === "device") {
+                setMood("This device");
+                setModView(false);
+                setChosenClip(null);
+                setClipIndex(0);
+              }
               void refresh();
               notify(
                 destination === "cloud" && upload === "clip"

@@ -4,12 +4,10 @@ import { api } from "../lib/cloud";
 import type { Media } from "../types";
 export default function Visuals({
   clip,
-  paused,
   onError,
   onReady,
 }: {
   clip: Media;
-  paused: boolean;
   onError: (s: string) => void;
   onReady: (id: string) => void;
 }) {
@@ -25,40 +23,49 @@ export default function Visuals({
   useEffect(() => {
     const ticket = ++seq.current;
     let active = true;
+    let settled = false;
+    function show(url?: string) {
+      if (!active || settled) return;
+      settled = true;
+      setLayers((old) => {
+        const previous = [...old]
+          .reverse()
+          .find((layer) => layer.ready && layer.clip.id !== clip.id);
+        old.filter((layer) => layer !== previous).forEach((layer) => {
+          if (layer.url && urls.current.delete(layer.url)) {
+            URL.revokeObjectURL(layer.url);
+          }
+        });
+        return [
+          ...(previous ? [previous] : []),
+          { clip, url, key: `${clip.id}-${ticket}`, ready: !url },
+        ];
+      });
+    }
+    const deadline = setTimeout(() => show(), 8000);
     async function load() {
       try {
-        let url: string | undefined = clip.externalUrl;
-        if (!clip.demo) {
-          const blob = clip.blob || (await api(`stream/${clip.id}`));
-          if (!active) return;
-          url = URL.createObjectURL(blob);
-          urls.current.add(url);
+        if (clip.demo) {
+          show(clip.externalUrl);
+          return;
         }
-        if (active)
-          setLayers((old) => {
-            const previous = [...old]
-              .reverse()
-              .find((layer) => layer.ready && layer.clip.id !== clip.id);
-            old
-              .filter((layer) => layer !== previous)
-              .forEach((layer) => {
-                if (layer.url && urls.current.has(layer.url)) {
-                  URL.revokeObjectURL(layer.url);
-                  urls.current.delete(layer.url);
-                }
-              });
-            return [
-              ...(previous ? [previous] : []),
-              { clip, url, key: `${clip.id}-${ticket}`, ready: !url },
-            ];
-          });
+        if (clip.local && !clip.blob) throw new Error("Import this clip again to restore its device copy.");
+        const blob = clip.blob || (await api(`stream/${clip.id}`));
+        if (!active || settled) return;
+        const url = URL.createObjectURL(blob);
+        urls.current.add(url);
+        show(url);
       } catch (e) {
-        if (active) onError((e as Error).message);
+        if (active && !settled && clip.local) onError((e as Error).message);
+        show();
+      } finally {
+        clearTimeout(deadline);
       }
     }
     void load();
     return () => {
       active = false;
+      clearTimeout(deadline);
     };
   }, [clip.id]);
   useEffect(() => {
@@ -86,6 +93,9 @@ export default function Visuals({
   );
   return (
     <div className="playback-visuals">
+      {!layers.some((layer) => layer.ready) && (
+        <div className="visual-layer"><Scene scene={2} /></div>
+      )}
       {layers.map((l, index) => (
         <div
           key={l.key}
@@ -99,8 +109,13 @@ export default function Visuals({
           {l.url ? (
             <SilentVideo
               src={l.url}
-              paused={paused}
-              onError={onError}
+              onFailure={() => {
+                if (l.clip.local) onError("This device clip could not play. Try importing a compatible MP4.");
+                if (l.url && urls.current.delete(l.url)) URL.revokeObjectURL(l.url);
+                setLayers((old) => old.map((layer) =>
+                  layer.key === l.key ? { ...layer, url: undefined, ready: true } : layer,
+                ));
+              }}
               onReady={() =>
                 setLayers((old) =>
                   old.map((layer) =>
@@ -112,7 +127,7 @@ export default function Visuals({
               }
             />
           ) : (
-            <Scene scene={l.clip.scene || 0} paused={paused} />
+            <Scene scene={l.clip.scene ?? 2} />
           )}
         </div>
       ))}
@@ -121,72 +136,52 @@ export default function Visuals({
 }
 function SilentVideo({
   src,
-  paused,
-  onError,
+  onFailure,
   onReady,
 }: {
   src: string;
-  paused: boolean;
-  onError: (s: string) => void;
+  onFailure: () => void;
   onReady: () => void;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
-  const [ready, setReady] = useState(false);
+  const deadline = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const callbacks = useRef({ onFailure, onReady });
+  callbacks.current = { onFailure, onReady };
+
+  function waitForFrames() {
+    clearTimeout(deadline.current);
+    deadline.current = setTimeout(() => callbacks.current.onFailure(), 8000);
+  }
+
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (ref.current && ref.current.readyState < 2) {
-        onReady();
-        onError(
-          "This scene is taking too long to load. Keeping the backdrop until the next scene.",
-        );
-      }
-    }, 15000);
-    return () => clearTimeout(timer);
-  }, [src]);
-  useEffect(() => {
-    const v = ref.current!;
+    const video = ref.current!;
     let active = true;
-    v.muted = true;
-    if (paused) v.pause();
-    else
-      void v.play().catch((error: DOMException) => {
-        if (active && error.name === "NotAllowedError")
-          onError(
-            "Tap Play to start the clip. Your browser paused automatic video playback.",
-          );
-      });
+    video.muted = true;
+    waitForFrames();
+    void video.play().catch((error: DOMException) => {
+      if (active && error.name !== "AbortError") callbacks.current.onFailure();
+    });
     return () => {
       active = false;
+      clearTimeout(deadline.current);
     };
-  }, [src, paused]);
+  }, [src]);
+
   return (
-    <>
-      <div className="video-loading-backdrop" />
-      <video
-        ref={ref}
-        src={src}
-        style={{
-          position: "absolute",
-          inset: 0,
-          opacity: ready ? 1 : 0,
-          transition: "opacity 1.2s",
-        }}
-        muted
-        loop
-        playsInline
-        preload="metadata"
-        onCanPlay={() => {
-          setReady(true);
-          onReady();
-        }}
-        onError={() => {
-          setReady(false);
-          onReady();
-          onError(
-            "This clip could not play. Showing the city backdrop until the next clip. Choose another clip or a compatible MP4/WebM.",
-          );
-        }}
-      />
-    </>
+    <video
+      ref={ref}
+      src={src}
+      muted
+      autoPlay
+      loop
+      playsInline
+      preload="auto"
+      onPlaying={() => {
+        clearTimeout(deadline.current);
+        callbacks.current.onReady();
+      }}
+      onWaiting={waitForFrames}
+      onError={() => callbacks.current.onFailure()}
+    />
   );
 }

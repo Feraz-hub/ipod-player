@@ -45,7 +45,7 @@ export default function Upload({
     [error, setError] = useState("");
   const accountStorage = account && !!cloud;
   const [destination, setDestination] = useState<"cloud" | "device">(
-    accountStorage ? "cloud" : "device",
+    accountStorage && kind === "music" ? "cloud" : "device",
   );
   const cloudLimitReason = file
     ? file.size > cloudStorageRemaining
@@ -166,7 +166,7 @@ export default function Upload({
         rights_confirmed: consent,
       };
       if (!metadata.title) throw new Error("Add a title.");
-      if (kind === "clip" && (!consent || !permission.trim() || !source.trim()))
+      if (kind === "clip" && destination === "cloud" && (!consent || !permission.trim() || !source.trim()))
         throw new Error(
           "Add a source, permission details and confirm your sharing rights.",
         );
@@ -260,8 +260,8 @@ export default function Upload({
               disabled={busy || !!cloudLimitReason}
             />
             <span>
-              <strong>My account</strong>
-              <small>Private cloud library · available on all signed-in devices</small>
+              <strong>{kind === "clip" ? "Share with community" : "My account"}</strong>
+              <small>{kind === "clip" ? "Submit for public review" : "Private cloud library · available on all signed-in devices"}</small>
             </span>
           </label>
         )}
@@ -362,37 +362,41 @@ export default function Upload({
                 ))}
               </select>
             </label>
-            <label>
-              Original source
-              <input
-                required
-                type="url"
-                maxLength={500}
-                value={source}
-                onChange={(e) => setSource(e.target.value)}
-                placeholder="https://your-original-source…"
-              />
-            </label>
-            <label>
-              License / permission
-              <textarea
-                required
-                maxLength={1500}
-                value={permission}
-                onChange={(e) => setPermission(e.target.value)}
-                placeholder="For example: My original footage, shared under CC BY 4.0. Include evidence of permission."
-              />
-            </label>
-            <label className="checkbox">
-              <input
-                type="checkbox"
-                required
-                checked={consent}
-                onChange={(e) => setConsent(e.target.checked)}
-              />
-              I own this clip or have permission to share and stream it
-              publicly.
-            </label>
+            {destination === "cloud" && (
+              <>
+                <label>
+                  Original source
+                  <input
+                    required
+                    type="url"
+                    maxLength={500}
+                    value={source}
+                    onChange={(e) => setSource(e.target.value)}
+                    placeholder="https://your-original-source…"
+                  />
+                </label>
+                <label>
+                  License / permission
+                  <textarea
+                    required
+                    maxLength={1500}
+                    value={permission}
+                    onChange={(e) => setPermission(e.target.value)}
+                    placeholder="For example: My original footage, shared under CC BY 4.0. Include evidence of permission."
+                  />
+                </label>
+                <label className="checkbox">
+                  <input
+                    type="checkbox"
+                    required
+                    checked={consent}
+                    onChange={(e) => setConsent(e.target.checked)}
+                  />
+                  I own this clip or have permission to share and stream it
+                  publicly.
+                </label>
+              </>
+            )}
           </>
         )}
         {error && (
